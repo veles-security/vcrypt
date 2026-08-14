@@ -7,18 +7,18 @@ import (
 	"github.com/veles-security/vcrypt/key"
 )
 
-type KeyStorer interface {
+type Store interface {
 	Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error)
-	Replace(ctx context.Context, source string, keys []key.Key) error
+	Replace(ctx context.Context, keys []key.Key, conditions ...KeyQueryPredicate) error
 }
 
-type KeyStore struct {
+type store struct {
 	mu   sync.RWMutex
 	keys []key.Key
 }
 
-// Find implements [KeyStorer].
-func (k *KeyStore) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error) {
+// Find implements [Store].
+func (k *store) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -43,8 +43,8 @@ func (k *KeyStore) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([
 	return result, nil
 }
 
-// Replace implements [KeyStorer].
-func (k *KeyStore) Replace(ctx context.Context, source string, keys []key.Key) error {
+// Replace implements [Store].
+func (k *store) Replace(ctx context.Context, keys []key.Key, conditions ...KeyQueryPredicate) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -53,17 +53,22 @@ func (k *KeyStore) Replace(ctx context.Context, source string, keys []key.Key) e
 	defer k.mu.Unlock()
 
 	kept := k.keys[:0]
-	for _, candidate := range k.keys {
-		if candidate.Source != source {
-			kept = append(kept, candidate)
+	for i := range k.keys {
+		candidate := &k.keys[i]
+		matches := true
+		for _, condition := range conditions {
+			if condition != nil && !condition(candidate) {
+				matches = false
+				break
+			}
+		}
+		if !matches {
+			kept = append(kept, *candidate)
 		}
 	}
-	for _, replacement := range keys {
-		replacement.Source = source
-		kept = append(kept, replacement)
-	}
+	kept = append(kept, keys...)
 	k.keys = kept
 	return nil
 }
 
-var _ KeyStorer = &KeyStore{}
+var _ Store = &store{}
