@@ -22,6 +22,16 @@ const (
 	KeyOpDecrypt KeyOperation = "decrypt"
 )
 
+// Capability describes one cryptographic action that a key can perform with a
+// particular algorithm. Keeping use, operation, and algorithm in one value
+// prevents an algorithm from being interpreted as valid for an unrelated use
+// or operation.
+type Capability struct {
+	Use       KeyUse
+	Operation KeyOperation
+	Algorithm alg.Alg
+}
+
 type KeyStatus string
 
 const (
@@ -51,15 +61,9 @@ type Key struct {
 	// such as a JWKS endpoint or SAML metadata document.
 	Source string
 
-	// Uses lists the intended public-key uses, corresponding to the JWK "use"
-	// values "sig" and "enc".
-	Uses []KeyUse
-	// Operations lists the operations for which the key is authorized,
-	// corresponding to the JWK "key_ops" member.
-	Operations []KeyOperation
-	// Algorithms lists the OAuth 2.0, OpenID Connect, JOSE, or SAML algorithm
-	// identifiers with which the key may be used.
-	Algorithms []alg.Alg
+	// Capabilities lists the supported combinations of public-key use,
+	// operation, and OAuth 2.0, OpenID Connect, JOSE, or SAML algorithm.
+	Capabilities []Capability
 
 	// Status controls whether the key is eligible for use in its lifecycle.
 	Status KeyStatus

@@ -26,6 +26,46 @@ const (
 
 type RsaScheme struct{}
 
+var capabilities = map[string][]key.Capability{
+	"public": {
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS512},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS512},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSA1_5},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP256},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP384},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP512},
+	},
+	"private": {
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS512},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: PS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: PS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: PS512},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS512},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS256},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS384},
+		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS512},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSA1_5},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP256},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP384},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP512},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSA1_5},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP256},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP384},
+		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP512},
+	},
+}
+
 // DiscoverCapabilities implements [scheme.Scheme].
 func (r *RsaScheme) DiscoverCapabilities(k *key.Key) error {
 	if k == nil || k.Material == nil {
@@ -35,23 +75,13 @@ func (r *RsaScheme) DiscoverCapabilities(k *key.Key) error {
 		return fmt.Errorf("RSA scheme: key material is not RSA")
 	}
 
-	k.Uses = []key.KeyUse{key.KeyUseSigning, key.KeyUseEncryption}
-	k.Operations = []key.KeyOperation{key.KeyOpVerify, key.KeyOpEncrypt}
+	capabilitySet := "public"
 	if material, ok := k.Material.(key.PrivateKeyMaterial); ok {
 		if _, ok := material.Key.(*rsa.PrivateKey); ok {
-			k.Operations = []key.KeyOperation{
-				key.KeyOpSign,
-				key.KeyOpVerify,
-				key.KeyOpEncrypt,
-				key.KeyOpDecrypt,
-			}
+			capabilitySet = "private"
 		}
 	}
-	k.Algorithms = []alg.Alg{
-		RS256, RS384, RS512,
-		PS256, PS384, PS512,
-		RSA1_5, RSAOAEP, RSAOAEP256, RSAOAEP384, RSAOAEP512,
-	}
+	k.Capabilities = capabilities[capabilitySet]
 
 	return nil
 }
