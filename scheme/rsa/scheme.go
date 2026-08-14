@@ -1,9 +1,10 @@
 package rsa
 
 import (
-	"crypto/rsa"
+	stdrsa "crypto/rsa"
 	"fmt"
 
+	"github.com/veles-security/vcrypt"
 	"github.com/veles-security/vcrypt/alg"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/scheme"
@@ -71,19 +72,24 @@ func (r *RsaScheme) DiscoverCapabilities(k *key.Key) error {
 	if k == nil || k.Material == nil {
 		return fmt.Errorf("RSA scheme: missing key material")
 	}
-	if _, ok := k.Material.Public().(*rsa.PublicKey); !ok {
+	if _, ok := k.Material.Public().(*stdrsa.PublicKey); !ok {
 		return fmt.Errorf("RSA scheme: key material is not RSA")
 	}
 
 	capabilitySet := "public"
 	if material, ok := k.Material.(key.PrivateKeyMaterial); ok {
-		if _, ok := material.Key.(*rsa.PrivateKey); ok {
+		if _, ok := material.Key.(*stdrsa.PrivateKey); ok {
 			capabilitySet = "private"
 		}
 	}
 	k.Capabilities = capabilities[capabilitySet]
 
 	return nil
+}
+
+// Signer implements [scheme.Scheme].
+func (r *RsaScheme) Signer(*key.Key, alg.Alg) vcrypt.Signer {
+	panic("unimplemented")
 }
 
 var _ scheme.Scheme = &RsaScheme{}
