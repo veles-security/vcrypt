@@ -91,13 +91,13 @@ func (m *store) Bind(source keysource.Source) error {
 // RefreshAll implements [Manager].
 func (m *store) RefreshAll() error {
 	m.sourcesMU.RLock()
+	defer m.sourcesMU.RUnlock()
 	sources := make([]keysource.Source, 0, len(m.sources))
 	for _, source := range m.sources {
 		if _, ok := source.(keysource.SelfRefreshingSource); !ok {
 			sources = append(sources, source)
 		}
 	}
-	m.sourcesMU.RUnlock()
 	return m.loadSources(sources)
 }
 
