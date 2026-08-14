@@ -1,6 +1,7 @@
 package rsa
 
 import (
+	"crypto"
 	stdrsa "crypto/rsa"
 	"fmt"
 
@@ -88,8 +89,39 @@ func (r *RsaScheme) DiscoverCapabilities(k *key.Key) error {
 }
 
 // Signer implements [scheme.Scheme].
-func (r *RsaScheme) Signer(*key.Key, alg.Alg) vcrypt.Signer {
-	panic("unimplemented")
+func (r *RsaScheme) Signer(k *key.Key, algorithm alg.Alg) vcrypt.Signer {
+	if k == nil {
+		return nil
+	}
+	material, ok := k.Material.(key.PrivateKeyMaterial)
+	if !ok {
+		return nil
+	}
+	privateKey, ok := material.Key.(*stdrsa.PrivateKey)
+	if !ok {
+		return nil
+	}
+
+	var hash crypto.Hash
+	var pss bool
+	switch algorithm {
+	case RS256:
+		hash = crypto.SHA256
+	case RS384:
+		hash = crypto.SHA384
+	case RS512:
+		hash = crypto.SHA512
+	case PS256:
+		hash, pss = crypto.SHA256, true
+	case PS384:
+		hash, pss = crypto.SHA384, true
+	case PS512:
+		hash, pss = crypto.SHA512, true
+	default:
+		return nil
+	}
+
+	return &rsaSigner{key: privateKey, hash: hash, pss: pss}
 }
 
 var _ scheme.Scheme = &RsaScheme{}
