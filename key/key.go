@@ -1,6 +1,10 @@
 package key
 
-import "time"
+import (
+	"time"
+
+	"github.com/veles-security/vcrypt/alg"
+)
 
 type KeyUse string
 
@@ -55,7 +59,7 @@ type Key struct {
 	Operations []KeyOperation
 	// Algorithms lists the OAuth 2.0, OpenID Connect, JOSE, or SAML algorithm
 	// identifiers with which the key may be used.
-	Algorithms []string
+	Algorithms []alg.Alg
 
 	// Status controls whether the key is eligible for use in its lifecycle.
 	Status KeyStatus
