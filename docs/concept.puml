@@ -1,0 +1,164 @@
+@startuml "concept"
+
+package crypto {
+    class Service {
+        + Sign(ctx, []byte, options...) ([]byte, error)
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+}
+
+package keystore {
+    class Store {
+        + Load(ctx) error
+        + Reload(ctx) error
+        + Sources() []Source
+        + Repository() Repository
+    }
+
+    interface Repository {
+        + Find(query KeyQuery) []Key
+        + Replace(keys []Key, query KeyQuery) []Key
+    }
+
+    class KeyQuery {
+        + ID KeyID
+        + Use Use
+        + Operation Operation
+        + Algorithm Algorithm
+    }
+}
+
+package source {
+    interface Source {
+        + Load(ctx) []Key
+        + Reload(ctx) []Key
+    }
+
+    class FileSource {
+        + Load(ctx) []Key
+        + Reload(ctx) []Key
+    }
+
+    class JwksSource {
+        + Load(ctx) []Key
+        + Reload(ctx) []Key
+    }
+
+    class HsmSource {
+        + Load(ctx) []Key
+        + Reload(ctx) []Key
+    }
+}
+
+package key {
+    interface Key {
+        + Status
+        + Priority
+        + NotBefore
+        + NotAfter
+        + ID() KeyID
+        + Owner() string
+        + Source() string
+        + Backend() Backend
+    }
+    interface Material {
+        Kind()
+    }
+    class Capability {
+        + Use KeyUse
+        + Operation KeyOp
+        + Algorithm KeyAlg
+    }
+    interface Backend {
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
+
+        + Sign(ctx, []byte, options...) ([]byte, error)
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+}
+
+package backend {
+    class Registry {
+        + Register(backend Backend)
+        + BackendFor(material Material) Backend
+    }
+
+    class RsaBackendFactory {
+        + New(material Material) RsaBackend
+    }
+
+    class RsaBackend {
+        - material Material
+
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+
+    class EcBackendFactory {
+        + New(material Material) EcBackend
+    }
+
+    class EcBackend {
+        - material Material
+
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+
+    class HsmBackendFactory {
+        + New(material Material) HsmBackend
+    }
+
+    class HsmBackend {
+        - material Material
+
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+}
+
+Service o-- Store
+
+Store o-- Repository
+Store o-- Source
+
+Repository o-- Key
+
+Key *-- Backend
+
+Backend <|.. RsaBackend
+Backend <|.. EcBackend
+Backend <|.. HsmBackend
+
+RsaBackend .. RsaBackendFactory
+EcBackend .. EcBackendFactory
+HsmBackend .. HsmBackendFactory
+
+RsaBackendFactory --> Registry : Register()
+EcBackendFactory --> Registry : Register()
+HsmBackendFactory --> Registry : Register()
+
+Source <|.. FileSource
+Source <|.. JwksSource
+Source <|.. HsmSource
+
+
+FileSource --> Registry : BackendFor()
+JwksSource --> Registry : BackendFor()
+HsmSource --> Registry : BackendFor()
+
+@enduml
