@@ -4,6 +4,7 @@ import (
 	"crypto"
 	stdrsa "crypto/rsa"
 	"fmt"
+	"reflect"
 
 	"github.com/veles-security/vcrypt"
 	"github.com/veles-security/vcrypt/alg"
@@ -27,6 +28,10 @@ const (
 )
 
 type RsaScheme struct{}
+
+func init() {
+	scheme.Register(reflect.TypeOf((*stdrsa.PublicKey)(nil)), &RsaScheme{})
+}
 
 var capabilities = map[string][]key.Capability{
 	"public": {
