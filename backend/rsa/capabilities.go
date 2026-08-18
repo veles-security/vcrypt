@@ -1,40 +1,31 @@
 package rsa
 
-import (
-	"crypto"
-	stdrsa "crypto/rsa"
-	"fmt"
-	"reflect"
-
-	"github.com/veles-security/vcrypt"
-	"github.com/veles-security/vcrypt/alg"
-	"github.com/veles-security/vcrypt/key"
-	"github.com/veles-security/vcrypt/scheme"
-)
+import "github.com/veles-security/vcrypt/key"
 
 const (
-	RS256 alg.Alg = "RS256"
-	RS384 alg.Alg = "RS384"
-	RS512 alg.Alg = "RS512"
-	PS256 alg.Alg = "PS256"
-	PS384 alg.Alg = "PS384"
-	PS512 alg.Alg = "PS512"
+	RS256 key.KeyAlg = "RS256"
+	RS384 key.KeyAlg = "RS384"
+	RS512 key.KeyAlg = "RS512"
+	PS256 key.KeyAlg = "PS256"
+	PS384 key.KeyAlg = "PS384"
+	PS512 key.KeyAlg = "PS512"
 
-	RSA1_5     alg.Alg = "RSA1_5"
-	RSAOAEP    alg.Alg = "RSA-OAEP"
-	RSAOAEP256 alg.Alg = "RSA-OAEP-256"
-	RSAOAEP384 alg.Alg = "RSA-OAEP-384"
-	RSAOAEP512 alg.Alg = "RSA-OAEP-512"
+	RSA1_5     key.KeyAlg = "RSA1_5"
+	RSAOAEP    key.KeyAlg = "RSA-OAEP"
+	RSAOAEP256 key.KeyAlg = "RSA-OAEP-256"
+	RSAOAEP384 key.KeyAlg = "RSA-OAEP-384"
+	RSAOAEP512 key.KeyAlg = "RSA-OAEP-512"
 )
 
-type RsaScheme struct{}
+type MaterialType string
 
-func init() {
-	scheme.Register(reflect.TypeOf((*stdrsa.PublicKey)(nil)), &RsaScheme{})
-}
+const (
+	PUBLIC_MATERIAL  MaterialType = "public"
+	PRIVATE_MATERIAL MaterialType = "private"
+)
 
-var capabilities = map[string][]key.Capability{
-	"public": {
+var capabilities = map[MaterialType][]key.Capability{
+	PUBLIC_MATERIAL: {
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS256},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS384},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: RS512},
@@ -47,7 +38,7 @@ var capabilities = map[string][]key.Capability{
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP384},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP512},
 	},
-	"private": {
+	PRIVATE_MATERIAL: {
 		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS256},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS384},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpSign, Algorithm: RS512},
@@ -72,61 +63,3 @@ var capabilities = map[string][]key.Capability{
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP512},
 	},
 }
-
-// DiscoverCapabilities implements [scheme.Scheme].
-func (r *RsaScheme) DiscoverCapabilities(k *key.Key) error {
-	if k == nil || k.Material == nil {
-		return fmt.Errorf("RSA scheme: missing key material")
-	}
-	if _, ok := k.Material.Public().(*stdrsa.PublicKey); !ok {
-		return fmt.Errorf("RSA scheme: key material is not RSA")
-	}
-
-	capabilitySet := "public"
-	if material, ok := k.Material.(key.PrivateKeyMaterial); ok {
-		if _, ok := material.Key.(*stdrsa.PrivateKey); ok {
-			capabilitySet = "private"
-		}
-	}
-	k.Capabilities = capabilities[capabilitySet]
-
-	return nil
-}
-
-// Signer implements [scheme.Scheme].
-func (r *RsaScheme) Signer(k *key.Key, algorithm alg.Alg) vcrypt.Signer {
-	if k == nil {
-		return nil
-	}
-	material, ok := k.Material.(key.PrivateKeyMaterial)
-	if !ok {
-		return nil
-	}
-	privateKey, ok := material.Key.(*stdrsa.PrivateKey)
-	if !ok {
-		return nil
-	}
-
-	var hash crypto.Hash
-	var pss bool
-	switch algorithm {
-	case RS256:
-		hash = crypto.SHA256
-	case RS384:
-		hash = crypto.SHA384
-	case RS512:
-		hash = crypto.SHA512
-	case PS256:
-		hash, pss = crypto.SHA256, true
-	case PS384:
-		hash, pss = crypto.SHA384, true
-	case PS512:
-		hash, pss = crypto.SHA512, true
-	default:
-		return nil
-	}
-
-	return &rsaSigner{key: privateKey, hash: hash, pss: pss}
-}
-
-var _ scheme.Scheme = &RsaScheme{}

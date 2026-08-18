@@ -1,5 +1,14 @@
 @startuml "concept"
 
+package vapi {
+    interface Reader {
+        + ReadArtifact[A,C,O](ctx context.Context, carrier C, options ...O) (A, error)
+    }
+    interface Decoder {
+        + Decode[A,O](ctx context.Context, encoded []byte, options ...O) (A, error)
+    }
+}
+
 package crypto {
     class Service {
         + Sign(ctx, []byte, options...) ([]byte, error)
@@ -50,10 +59,15 @@ package source {
         + Load(ctx) []Key
         + Reload(ctx) []Key
     }
+
+    Source <|.. FileSource
+    Source <|.. JwksSource
+    Source <|.. HsmSource
 }
 
+
 package key {
-    interface Key {
+    class Key {
         + Status
         + Priority
         + NotBefore
@@ -61,10 +75,8 @@ package key {
         + ID() KeyID
         + Owner() string
         + Source() string
+        + Restrictions []Capability
         + Backend() Backend
-    }
-    interface Material {
-        Kind()
     }
     class Capability {
         + Use KeyUse
@@ -80,15 +92,90 @@ package key {
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
+    Key *-- Backend
+    Key --> Capability
+}
+
+package builder {
+    class KeyBuilder {
+        + Build(candidate KeyCandidate) Key
+    }
+    class KeyCandidate {
+        material Material
+        metadata
+    }
+}
+
+package reader {
+    class JwksReader {
+        + ReadArtifact(ctx, carrier http.Response, options ...O) ([]KeyCandidate, error)
+    }
+    class FileReader {
+        + ReadArtifact(ctx, carrier Path, options ...O) ([]KeyCandidate, error)
+    }
+    Reader <|.. JwksReader
+    Reader <|.. FileReader
+}
+
+package material {
+    interface Material {
+        Kind()
+    }
+    class PublicMaterial {
+        key PublicKey
+    }
+    class PrivateMaterial {
+        key PrivateKey
+    }
+    class SymetricMaterial {
+        key PrivateKey
+    }
+    Material <|.. PublicMaterial
+    Material <|.. PrivateMaterial
+    Material <|.. SymetricMaterial
+}
+
+package decoder {
+    class DecoderRegistry {
+        - decoders []Decoder[KeyCandidate,O]
+        + Register(decoder Decoder[KeyCandidate,O])
+        + Decode(keyType, encoded []byte) (KeyCandidate, error)
+    }
 }
 
 package backend {
     class Registry {
-        + Register(backend Backend)
+        - backends []BackendFactory
+        + Register(backend BackendFactory)
         + BackendFor(material Material) Backend
     }
 
+    interface BackendFactory {
+        + Supports(m Material) bool
+        + New(material Material) Backend
+    }
+}
+
+package scheme.ec {
+    class EcBackendFactory {
+        + Supports(m Material) bool
+        + New(material Material) EcBackend
+    }
+
+    class EcBackend {
+        - material Material
+
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
+        + Verify(ctx, []byte, []byte, options...) error
+        + Encrypt(ctx, []byte, options...) ([]byte, error)
+        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+}
+
+package scheme.rsa {
     class RsaBackendFactory {
+        + Supports(m Material) bool
         + New(material Material) RsaBackend
     }
 
@@ -102,21 +189,16 @@ package backend {
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
 
-    class EcBackendFactory {
-        + New(material Material) EcBackend
+    class RsaDecoder {
+        Decode(ctx, encoded []byte, options ...O) (KeyCandidate, error)
     }
+    Decoder <|.. RsaDecoder
+    RsaDecoder --> DecoderRegistry : Register()
+}
 
-    class EcBackend {
-        - material Material
-
-        + Supports(use, operation, algorithm) bool
-        + Capabilities() []Capability
-        + Verify(ctx, []byte, []byte, options...) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
-    }
-
+package scheme.hsm {
     class HsmBackendFactory {
+        + Supports(m Material) bool
         + New(material Material) HsmBackend
     }
 
@@ -136,29 +218,28 @@ Service o-- Store
 Store o-- Repository
 Store o-- Source
 
+
 Repository o-- Key
 
-Key *-- Backend
+KeyBuilder --> Key
+KeyBuilder --> Registry
 
 Backend <|.. RsaBackend
 Backend <|.. EcBackend
 Backend <|.. HsmBackend
 
-RsaBackend .. RsaBackendFactory
-EcBackend .. EcBackendFactory
-HsmBackend .. HsmBackendFactory
 
-RsaBackendFactory --> Registry : Register()
-EcBackendFactory --> Registry : Register()
-HsmBackendFactory --> Registry : Register()
+Registry o-- BackendFactory
 
-Source <|.. FileSource
-Source <|.. JwksSource
-Source <|.. HsmSource
+BackendFactory <|.. RsaBackendFactory
+BackendFactory <|.. EcBackendFactory
+BackendFactory <|.. HsmBackendFactory
 
+Source --> KeyBuilder
 
-FileSource --> Registry : BackendFor()
-JwksSource --> Registry : BackendFor()
-HsmSource --> Registry : BackendFor()
+KeyCandidate *-- Material
+
+JwksReader --> DecoderRegistry
+JwksSource --> JwksReader
 
 @enduml

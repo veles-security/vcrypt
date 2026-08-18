@@ -3,34 +3,8 @@ package key
 import (
 	"time"
 
-	"github.com/veles-security/vcrypt/alg"
+	"github.com/veles-security/vcrypt/material"
 )
-
-type KeyUse string
-
-const (
-	KeyUseSigning    KeyUse = "signing"
-	KeyUseEncryption KeyUse = "encryption"
-)
-
-type KeyOperation string
-
-const (
-	KeyOpSign    KeyOperation = "sign"
-	KeyOpVerify  KeyOperation = "verify"
-	KeyOpEncrypt KeyOperation = "encrypt"
-	KeyOpDecrypt KeyOperation = "decrypt"
-)
-
-// Capability describes one cryptographic action that a key can perform with a
-// particular algorithm. Keeping use, operation, and algorithm in one value
-// prevents an algorithm from being interpreted as valid for an unrelated use
-// or operation.
-type Capability struct {
-	Use       KeyUse
-	Operation KeyOperation
-	Algorithm alg.Alg
-}
 
 type KeyStatus string
 
@@ -61,9 +35,9 @@ type Key struct {
 	// such as a JWKS endpoint or SAML metadata document.
 	Source string
 
-	// Capabilities lists the supported combinations of public-key use,
+	// Restrictions lists the restricted combinations of key use,
 	// operation, and OAuth 2.0, OpenID Connect, JOSE, or SAML algorithm.
-	Capabilities []Capability
+	Restrictions []Capability
 
 	// Status controls whether the key is eligible for use in its lifecycle.
 	Status KeyStatus
@@ -78,5 +52,5 @@ type Key struct {
 
 	// Material contains the cryptographic key and its representation-specific
 	// metadata.
-	Material KeyMaterial
+	Material material.Material
 }
