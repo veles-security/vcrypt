@@ -7,5 +7,5 @@ import (
 
 type Factory interface {
 	Supports(material material.Material) bool
-	New(material material.Material) key.Backend
+	New(material material.Material) (key.Backend, error)
 }

@@ -34,7 +34,7 @@ func BackendFor(material material.Material) (key.Backend, error) {
 	for i := len(regsitry.factories) - 1; i >= 0; i-- {
 		backendFactory := regsitry.factories[i]
 		if backendFactory.Supports(material) {
-			return backendFactory.New(material), nil
+			return backendFactory.New(material)
 		}
 	}
 
