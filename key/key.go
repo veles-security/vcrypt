@@ -27,30 +27,71 @@ const (
 
 type Key struct {
 	// ID identifies the key. For JWKs, this corresponds to the "kid" member.
-	ID string
+	id string
 	// Owner identifies the party that owns or publishes the key, typically an
 	// OAuth 2.0 authorization server, OpenID Provider issuer, or SAML entity.
-	Owner string
+	owner string
 	// Source identifies the origin from which the key material was obtained,
 	// such as a JWKS endpoint or SAML metadata document.
-	Source string
+	source string
 
 	// Restrictions lists the restricted combinations of key use,
 	// operation, and OAuth 2.0, OpenID Connect, JOSE, or SAML algorithm.
-	Restrictions []Capability
+	restrictions []Capability
 
 	// Status controls whether the key is eligible for use in its lifecycle.
-	Status KeyStatus
+	status KeyStatus
 	// Priority determines preference when multiple eligible keys match.
-	Priority int
+	priority int
 	// NotBefore is the earliest instant at which the key is valid. A zero value
 	// means that no lower validity bound is specified.
-	NotBefore time.Time
+	notBefore time.Time
 	// NotAfter is the instant after which the key is no longer valid. A zero
 	// value means that no upper validity bound is specified.
-	NotAfter time.Time
+	notAfter time.Time
 
 	// Material contains the cryptographic key and its representation-specific
 	// metadata.
-	Material material.Material
+	material material.Material
+	backend  Backend
+}
+
+func New(candidate KeyCandidate, backend Backend) Key {
+	return Key{
+		id:           candidate.ID,
+		owner:        candidate.Owner,
+		source:       candidate.Source,
+		restrictions: append([]Capability(nil), candidate.Restrictions...),
+		status:       candidate.Status,
+		priority:     candidate.Priority,
+		notBefore:    candidate.NotBefore,
+		notAfter:     candidate.NotAfter,
+		material:     candidate.Material,
+		backend:      backend,
+	}
+}
+
+func (key Key) ID() string                  { return key.id }
+func (key Key) Owner() string               { return key.owner }
+func (key Key) Source() string              { return key.source }
+func (key Key) Status() KeyStatus           { return key.status }
+func (key Key) Priority() int               { return key.priority }
+func (key Key) NotBefore() time.Time        { return key.notBefore }
+func (key Key) NotAfter() time.Time         { return key.notAfter }
+func (key Key) Material() material.Material { return key.material }
+func (key Key) Backend() Backend            { return key.backend }
+func (key Key) Restrictions() []Capability {
+	return append([]Capability(nil), key.restrictions...)
+}
+
+type KeyCandidate struct {
+	ID           string
+	Owner        string
+	Source       string
+	Restrictions []Capability
+	Status       KeyStatus
+	Priority     int
+	NotBefore    time.Time
+	NotAfter     time.Time
+	Material     material.Material
 }
