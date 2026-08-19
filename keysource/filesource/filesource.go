@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/veles-security/vcrypt/key"
-	"github.com/veles-security/vcrypt/keybuilder"
 	"github.com/veles-security/vcrypt/keysource"
 	"github.com/veles-security/vcrypt/material"
 )
@@ -32,14 +31,14 @@ type fileSource struct {
 	candidate    key.KeyCandidate
 
 	mu       sync.Mutex
-	callback func([]key.Key) error
+	callback func([]key.KeyCandidate) error
 	started  bool
 	snapshot string
 }
 
 func (f *fileSource) ID() string { return f.id }
 
-func (f *fileSource) Load() ([]key.Key, error) {
+func (f *fileSource) Load() ([]key.KeyCandidate, error) {
 	keys, snapshot, err := f.load()
 	if err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func (f *fileSource) Load() ([]key.Key, error) {
 	return keys, nil
 }
 
-func (f *fileSource) SetRefreshCallback(callback func([]key.Key) error) {
+func (f *fileSource) SetRefreshCallback(callback func([]key.KeyCandidate) error) {
 	f.mu.Lock()
 	f.callback = callback
 	f.startMonitorLocked()
@@ -90,13 +89,13 @@ func (f *fileSource) watch() {
 	}
 }
 
-func (f *fileSource) load() ([]key.Key, string, error) {
+func (f *fileSource) load() ([]key.KeyCandidate, string, error) {
 	files, err := sourceFiles(f.path)
 	if err != nil {
 		return nil, "", err
 	}
 	hash := sha256.New()
-	keys := make([]key.Key, 0, len(files))
+	keys := make([]key.KeyCandidate, 0, len(files))
 	for _, path := range files {
 		encoded, err := os.ReadFile(path)
 		if err != nil {
@@ -144,7 +143,7 @@ func sourceFiles(path string) ([]string, error) {
 	return files, nil
 }
 
-func (f *fileSource) decode(path string, encoded []byte) ([]key.Key, error) {
+func (f *fileSource) decode(path string, encoded []byte) ([]key.KeyCandidate, error) {
 	var blocks []*pem.Block
 	rest := encoded
 	for {
@@ -161,7 +160,7 @@ func (f *fileSource) decode(path string, encoded []byte) ([]key.Key, error) {
 		return nil, fmt.Errorf("decode key file %q: data found outside PEM blocks", path)
 	}
 
-	result := make([]key.Key, 0, len(blocks))
+	result := make([]key.KeyCandidate, 0, len(blocks))
 	for i, block := range blocks {
 		candidate := f.candidate
 		candidate.Restrictions = append([]key.Capability(nil), f.candidate.Restrictions...)
@@ -175,11 +174,7 @@ func (f *fileSource) decode(path string, encoded []byte) ([]key.Key, error) {
 			return nil, fmt.Errorf("decode key file %q block %d: %w", path, i+1, err)
 		}
 		candidate.Material = parsed
-		built, err := keybuilder.Build(candidate)
-		if err != nil {
-			return nil, fmt.Errorf("build key from %q block %d: %w", path, i+1, err)
-		}
-		result = append(result, *built)
+		result = append(result, candidate)
 	}
 	return result, nil
 }

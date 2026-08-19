@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/veles-security/vcrypt/key"
-	"github.com/veles-security/vcrypt/keybuilder"
 	"github.com/veles-security/vcrypt/keysource"
 	"github.com/veles-security/vcrypt/material"
 )
@@ -40,11 +39,11 @@ type Source struct {
 	lifetime time.Duration
 
 	mu       sync.Mutex
-	callback func([]key.Key) error
+	callback func([]key.KeyCandidate) error
 	started  bool
 	base     time.Time
 	epoch    int64
-	keys     map[int64]key.Key
+	keys     map[int64]key.KeyCandidate
 	wake     chan struct{}
 	now      func() time.Time
 }
@@ -61,7 +60,7 @@ func New(id string, keyType KeyType, lifetime time.Duration) (*Source, error) {
 	if !validKeyType(keyType) {
 		return nil, fmt.Errorf("random source key type %q is unsupported", keyType)
 	}
-	return &Source{id: id, keyType: keyType, lifetime: lifetime, keys: make(map[int64]key.Key), wake: make(chan struct{}, 1), now: time.Now}, nil
+	return &Source{id: id, keyType: keyType, lifetime: lifetime, keys: make(map[int64]key.KeyCandidate), wake: make(chan struct{}, 1), now: time.Now}, nil
 }
 
 func (s *Source) ID() string { return s.id }
@@ -69,7 +68,7 @@ func (s *Source) ID() string { return s.id }
 // Load returns the previous, current, and future keys. On the first call it
 // creates all three, including a previous passive key whose validity began one
 // lifetime ago.
-func (s *Source) Load() ([]key.Key, error) {
+func (s *Source) Load() ([]key.KeyCandidate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	keys, err := s.rotateLocked(s.now())
@@ -81,7 +80,7 @@ func (s *Source) Load() ([]key.Key, error) {
 
 // SetRefreshCallback supplies the function used to replace this source's keys
 // after an automatic rotation.
-func (s *Source) SetRefreshCallback(callback func([]key.Key) error) {
+func (s *Source) SetRefreshCallback(callback func([]key.KeyCandidate) error) {
 	s.mu.Lock()
 	s.callback = callback
 	s.startLocked()
@@ -127,7 +126,7 @@ func (s *Source) watch() {
 	}
 }
 
-func (s *Source) rotateLocked(now time.Time) ([]key.Key, error) {
+func (s *Source) rotateLocked(now time.Time) ([]key.KeyCandidate, error) {
 	if s.base.IsZero() {
 		s.base = now
 		s.epoch = 0
@@ -148,10 +147,10 @@ func (s *Source) rotateLocked(now time.Time) ([]key.Key, error) {
 			delete(s.keys, epoch)
 		}
 	}
-	return []key.Key{s.withStatus(s.keys[s.epoch-1], key.KeyStatusPassive), s.withStatus(s.keys[s.epoch], key.KeyStatusActive), s.withStatus(s.keys[s.epoch+1], key.KeyStatusPassive)}, nil
+	return []key.KeyCandidate{s.withStatus(s.keys[s.epoch-1], key.KeyStatusPassive), s.withStatus(s.keys[s.epoch], key.KeyStatusActive), s.withStatus(s.keys[s.epoch+1], key.KeyStatusPassive)}, nil
 }
 
-func (s *Source) generate(epoch int64) (key.Key, error) {
+func (s *Source) generate(epoch int64) (key.KeyCandidate, error) {
 	var m material.Material
 	var err error
 	switch s.keyType {
@@ -172,20 +171,17 @@ func (s *Source) generate(epoch int64) (key.Key, error) {
 		m = &material.SymmetricMaterial{Key: secret}
 	}
 	if err != nil {
-		return key.Key{}, fmt.Errorf("generate %s key: %w", s.keyType, err)
+		return key.KeyCandidate{}, fmt.Errorf("generate %s key: %w", s.keyType, err)
 	}
 	start := s.base.Add(time.Duration(epoch) * s.lifetime)
 	// A key is active for one lifetime and remains valid for one more lifetime
 	// while passive, allowing signatures from its active epoch to be verified.
-	built, err := keybuilder.Build(key.KeyCandidate{ID: fmt.Sprintf("%s-%d", s.id, epoch), Source: s.id, Status: key.KeyStatusPassive, NotBefore: start, NotAfter: start.Add(2 * s.lifetime), Material: m})
-	if err != nil {
-		return key.Key{}, fmt.Errorf("build random key: %w", err)
-	}
-	return *built, nil
+	return key.KeyCandidate{ID: fmt.Sprintf("%s-%d", s.id, epoch), Source: s.id, Status: key.KeyStatusPassive, NotBefore: start, NotAfter: start.Add(2 * s.lifetime), Material: m}, nil
 }
 
-func (s *Source) withStatus(k key.Key, status key.KeyStatus) key.Key {
-	return key.New(key.KeyCandidate{ID: k.ID(), Owner: k.Owner(), Source: k.Source(), Restrictions: k.Restrictions(), Status: status, Priority: k.Priority(), NotBefore: k.NotBefore(), NotAfter: k.NotAfter(), Material: k.Material()}, k.Backend())
+func (s *Source) withStatus(candidate key.KeyCandidate, status key.KeyStatus) key.KeyCandidate {
+	candidate.Status = status
+	return candidate
 }
 
 func validKeyType(t KeyType) bool {

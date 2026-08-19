@@ -24,15 +24,15 @@ func TestLoadPublishesThreeEpochsAndRetainsKeys(t *testing.T) {
 	}
 	wantStatuses := []key.KeyStatus{key.KeyStatusPassive, key.KeyStatusActive, key.KeyStatusPassive}
 	for i, want := range wantStatuses {
-		if keys[i].Status() != want {
-			t.Errorf("key %d status = %q, want %q", i, keys[i].Status(), want)
+		if keys[i].Status != want {
+			t.Errorf("key %d status = %q, want %q", i, keys[i].Status, want)
 		}
-		if got := keys[i].NotAfter().Sub(keys[i].NotBefore()); got != 2*time.Hour {
+		if got := keys[i].NotAfter.Sub(keys[i].NotBefore); got != 2*time.Hour {
 			t.Errorf("key %d lifetime = %v", i, got)
 		}
 	}
-	if !keys[0].NotBefore().Equal(now.Add(-time.Hour)) || !keys[1].NotBefore().Equal(now) || !keys[2].NotBefore().Equal(now.Add(time.Hour)) {
-		t.Fatalf("unexpected validity windows: %v, %v, %v", keys[0].NotBefore(), keys[1].NotBefore(), keys[2].NotBefore())
+	if !keys[0].NotBefore.Equal(now.Add(-time.Hour)) || !keys[1].NotBefore.Equal(now) || !keys[2].NotBefore.Equal(now.Add(time.Hour)) {
+		t.Fatalf("unexpected validity windows: %v, %v, %v", keys[0].NotBefore, keys[1].NotBefore, keys[2].NotBefore)
 	}
 
 	oldCurrent := keys[1]
@@ -41,14 +41,14 @@ func TestLoadPublishesThreeEpochsAndRetainsKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if keys[0].ID() != oldCurrent.ID() {
-		t.Errorf("old active key was not retained: got %q, want %q", keys[0].ID(), oldCurrent.ID())
+	if keys[0].ID != oldCurrent.ID {
+		t.Errorf("old active key was not retained: got %q, want %q", keys[0].ID, oldCurrent.ID)
 	}
-	if keys[0].Material() != oldCurrent.Material() {
+	if keys[0].Material != oldCurrent.Material {
 		t.Error("rotation regenerated the old key material")
 	}
-	if keys[0].Status() != key.KeyStatusPassive {
-		t.Errorf("old key status = %q", keys[0].Status())
+	if keys[0].Status != key.KeyStatusPassive {
+		t.Errorf("old key status = %q", keys[0].Status)
 	}
 }
 

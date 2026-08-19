@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/veles-security/vcrypt/key"
+	"github.com/veles-security/vcrypt/keybuilder"
 	"github.com/veles-security/vcrypt/keysource"
 )
 
@@ -34,7 +35,11 @@ func (m *store) Replace(ctx context.Context, keys []key.Key, conditions ...KeyQu
 func (m *store) bindSelfRefreshing(source keysource.Source) {
 	id := source.ID()
 	if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
-		selfRefreshing.SetRefreshCallback(func(keys []key.Key) error {
+		selfRefreshing.SetRefreshCallback(func(candidates []key.KeyCandidate) error {
+			keys, err := buildCandidates(candidates)
+			if err != nil {
+				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
+			}
 			if err := m.repository.Replace(context.Background(), keys, WithSource(id)); err != nil {
 				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 			}
@@ -67,14 +72,21 @@ func (m *store) Bind(source keysource.Source) error {
 
 	m.bindSelfRefreshing(source)
 
-	keys, err := source.Load()
+	candidates, err := source.Load()
+	var keys []key.Key
+	if err != nil {
+		err = fmt.Errorf("failed to load keys from source %s: %w", id, err)
+	} else {
+		keys, err = buildCandidates(candidates)
+		if err != nil {
+			err = fmt.Errorf("failed to build keys from source %s: %w", id, err)
+		}
+	}
 	if err == nil {
 		err = m.repository.Replace(context.Background(), keys, WithSource(id))
 		if err != nil {
 			err = fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 		}
-	} else {
-		err = fmt.Errorf("failed to load keys from source %s: %w", id, err)
 	}
 	m.sourcesMU.Lock()
 	delete(m.loading, id)
@@ -108,9 +120,14 @@ func (m *store) loadSources(sources []keysource.Source) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			keys, err := source.Load()
+			candidates, err := source.Load()
 			if err != nil {
 				errs <- fmt.Errorf("failed to load keys from source %s: %w", source.ID(), err)
+				return
+			}
+			keys, err := buildCandidates(candidates)
+			if err != nil {
+				errs <- fmt.Errorf("failed to build keys from source %s: %w", source.ID(), err)
 				return
 			}
 			if err := m.repository.Replace(context.Background(), keys, WithSource(source.ID())); err != nil {
@@ -125,6 +142,18 @@ func (m *store) loadSources(sources []keysource.Source) error {
 		result = errors.Join(result, err)
 	}
 	return result
+}
+
+func buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error) {
+	keys := make([]key.Key, 0, len(candidates))
+	for i, candidate := range candidates {
+		built, err := keybuilder.Build(candidate)
+		if err != nil {
+			return nil, fmt.Errorf("candidate %d: %w", i+1, err)
+		}
+		keys = append(keys, *built)
+	}
+	return keys, nil
 }
 
 var _ Store = &store{}
