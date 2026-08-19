@@ -48,6 +48,16 @@ func (b *testBackend) VerifySignature(_ context.Context, algorithm key.KeyAlg, s
 	return nil
 }
 
+func (b *testBackend) Encrypt(_ context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
+	b.calledAlgorithm = algorithm
+	return append([]byte(nil), plaintext...), nil
+}
+
+func (b *testBackend) Decrypt(_ context.Context, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
+	b.calledAlgorithm = algorithm
+	return append([]byte(nil), ciphertext...), nil
+}
+
 func TestServiceSignReturnsSelectedKeyDescriptor(t *testing.T) {
 	service, err := New()
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/veles-security/vcrypt/key"
@@ -70,6 +71,16 @@ func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyA
 		return fmt.Errorf("EC backend: invalid signature")
 	}
 	return nil
+}
+
+// Encrypt implements [key.Backend].
+func (b *privateBackend) Encrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("EC backend: unsupported operation")
+}
+
+// Decrypt implements [key.Backend].
+func (b *privateBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("EC backend: unsupported operation")
 }
 
 var _ key.Backend = &privateBackend{}

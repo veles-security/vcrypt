@@ -101,4 +101,28 @@ func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyA
 	return stdrsa.VerifyPKCS1v15(&privateKey.PublicKey, hash, digest, signature)
 }
 
+// Encrypt implements [key.Backend].
+func (b *privateBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	privateKey, ok := b.material.Key.(*stdrsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("RSA backend: key material is not an RSA private key")
+	}
+	return encrypt(&privateKey.PublicKey, algorithm, plaintext)
+}
+
+// Decrypt implements [key.Backend].
+func (b *privateBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	privateKey, ok := b.material.Key.(*stdrsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("RSA backend: key material is not an RSA private key")
+	}
+	return decrypt(privateKey, algorithm, ciphertext)
+}
+
 var _ key.Backend = &privateBackend{}

@@ -57,4 +57,14 @@ func (b *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAl
 	return nil
 }
 
+// Encrypt implements [key.Backend].
+func (b *publicBackend) Encrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("EC backend: unsupported operation")
+}
+
+// Decrypt implements [key.Backend].
+func (b *publicBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("EC backend: unsupported operation")
+}
+
 var _ key.Backend = &publicBackend{}

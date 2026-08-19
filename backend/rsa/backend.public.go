@@ -80,4 +80,21 @@ func (p *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAl
 	return stdrsa.VerifyPKCS1v15(publicKey, hash, digest, signature)
 }
 
+// Encrypt implements [key.Backend].
+func (p *publicBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	publicKey, ok := p.material.Key.(*stdrsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("RSA backend: key material is not an RSA public key")
+	}
+	return encrypt(publicKey, algorithm, plaintext)
+}
+
+// Decrypt implements [key.Backend].
+func (p *publicBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("RSA backend: unsupported operation")
+}
+
 var _ key.Backend = &publicBackend{}

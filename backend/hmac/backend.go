@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	stdhmac "crypto/hmac"
+	"errors"
 	"fmt"
 
 	"github.com/veles-security/vcrypt/key"
@@ -79,6 +80,16 @@ func (b *symmetricBackend) VerifySignature(ctx context.Context, algorithm key.Ke
 		return fmt.Errorf("HMAC backend: invalid signature")
 	}
 	return nil
+}
+
+// Encrypt implements [key.Backend].
+func (b *symmetricBackend) Encrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("HMAC backend: unsupported operation")
+}
+
+// Decrypt implements [key.Backend].
+func (b *symmetricBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
+	return nil, errors.New("HMAC backend: unsupported operation")
 }
 
 var _ key.Backend = &symmetricBackend{}
