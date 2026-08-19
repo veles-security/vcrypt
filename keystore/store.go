@@ -36,7 +36,7 @@ func (m *store) bindSelfRefreshing(source keysource.Source) {
 	id := source.ID()
 	if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
 		selfRefreshing.SetRefreshCallback(func(candidates []key.KeyCandidate) error {
-			keys, err := buildCandidates(candidates)
+			keys, err := m.buildCandidates(candidates)
 			if err != nil {
 				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
 			}
@@ -77,7 +77,7 @@ func (m *store) Bind(source keysource.Source) error {
 	if err != nil {
 		err = fmt.Errorf("failed to load keys from source %s: %w", id, err)
 	} else {
-		keys, err = buildCandidates(candidates)
+		keys, err = m.buildCandidates(candidates)
 		if err != nil {
 			err = fmt.Errorf("failed to build keys from source %s: %w", id, err)
 		}
@@ -125,7 +125,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 				errs <- fmt.Errorf("failed to load keys from source %s: %w", source.ID(), err)
 				return
 			}
-			keys, err := buildCandidates(candidates)
+			keys, err := m.buildCandidates(candidates)
 			if err != nil {
 				errs <- fmt.Errorf("failed to build keys from source %s: %w", source.ID(), err)
 				return
@@ -144,7 +144,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 	return result
 }
 
-func buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error) {
+func (m *store) buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error) {
 	keys := make([]key.Key, 0, len(candidates))
 	for i, candidate := range candidates {
 		built, err := keybuilder.Build(candidate)
