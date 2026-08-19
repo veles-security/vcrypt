@@ -11,12 +11,50 @@ import (
 	"github.com/veles-security/vcrypt/keystore"
 )
 
-// SignRequest describes the key selection policy for a signing operation.
-// Algorithms are considered in order of preference.
-type SignRequest struct {
+type operationOptions struct {
 	Owner      string
 	Source     string
 	Algorithms []key.KeyAlg
+	Kid        string
+}
+
+// SignOption configures key selection for a signing operation.
+type SignOption func(*operationOptions) error
+
+// VerifyOption configures key selection for a signature verification
+// operation.
+type VerifyOption = SignOption
+
+// WithOwner restricts key selection to keys owned by owner.
+func WithOwner(owner string) SignOption {
+	return func(options *operationOptions) error {
+		options.Owner = owner
+		return nil
+	}
+}
+
+// WithSource restricts key selection to keys from source.
+func WithSource(source string) SignOption {
+	return func(options *operationOptions) error {
+		options.Source = source
+		return nil
+	}
+}
+
+// WithAlgorithms sets algorithms in order of preference.
+func WithAlgorithms(algorithms ...key.KeyAlg) SignOption {
+	return func(options *operationOptions) error {
+		options.Algorithms = append([]key.KeyAlg(nil), algorithms...)
+		return nil
+	}
+}
+
+// WithKid restricts key selection to the key with kid.
+func WithKid(kid string) SignOption {
+	return func(options *operationOptions) error {
+		options.Kid = kid
+		return nil
+	}
 }
 
 // SignResult contains the signature and the exact key selection made by the
@@ -26,21 +64,18 @@ type SignResult struct {
 	Key       key.KeyDescriptor
 }
 
-// VerifyRequest describes a signature verification operation. Key is normally
-// populated from the kid and alg token headers.
-type VerifyRequest struct {
-	Key       key.KeyDescriptor
-	Signature []byte
-}
-
 // Sign selects an active key that supports one of the requested algorithms and
 // signs message with it.
-func (s *Service) Sign(ctx context.Context, message []byte, request SignRequest) (SignResult, error) {
+func (s *Service) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
+	request, err := applyOperationOptions(options)
+	if err != nil {
+		return SignResult{}, fmt.Errorf("vcrypt: apply signing option: %w", err)
+	}
 	if len(request.Algorithms) == 0 {
 		return SignResult{}, fmt.Errorf("vcrypt: signing algorithms are empty")
 	}
 
-	selected, algorithm, err := s.selectKey(ctx, key.KeyOpSign, request.Owner, request.Source, "", request.Algorithms)
+	selected, algorithm, err := s.selectKey(ctx, key.KeyOpSign, request.Owner, request.Source, request.Kid, request.Algorithms)
 	if err != nil {
 		return SignResult{}, err
 	}
@@ -56,32 +91,49 @@ func (s *Service) Sign(ctx context.Context, message []byte, request SignRequest)
 	}, nil
 }
 
-// VerifySignature selects the key described by request and verifies its
-// signature. Active and passive keys are eligible for verification.
-func (s *Service) VerifySignature(ctx context.Context, message []byte, request VerifyRequest) error {
-	if strings.TrimSpace(request.Key.ID) == "" {
+// VerifySignature selects a key and verifies signature. Active and passive
+// keys are eligible for verification.
+func (s *Service) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
+	request, err := applyOperationOptions(options)
+	if err != nil {
+		return fmt.Errorf("vcrypt: apply verification option: %w", err)
+	}
+	if strings.TrimSpace(request.Kid) == "" {
 		return fmt.Errorf("vcrypt: verification key ID is empty")
 	}
-	if request.Key.Algorithm == "" {
+	if len(request.Algorithms) == 0 {
 		return fmt.Errorf("vcrypt: verification algorithm is empty")
 	}
 
-	selected, _, err := s.selectKey(
+	selected, algorithm, err := s.selectKey(
 		ctx,
 		key.KeyOpVerify,
-		request.Key.Owner,
-		request.Key.Source,
-		request.Key.ID,
-		[]key.KeyAlg{request.Key.Algorithm},
+		request.Owner,
+		request.Source,
+		request.Kid,
+		request.Algorithms,
 	)
 	if err != nil {
 		return err
 	}
 
-	if err := selected.Backend().VerifySignature(ctx, request.Key.Algorithm, request.Signature, message); err != nil {
-		return fmt.Errorf("vcrypt: verify with key %q and algorithm %q: %w", selected.ID(), request.Key.Algorithm, err)
+	if err := selected.Backend().VerifySignature(ctx, algorithm, signature, message); err != nil {
+		return fmt.Errorf("vcrypt: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 	return nil
+}
+
+func applyOperationOptions[T ~func(*operationOptions) error](options []T) (operationOptions, error) {
+	var request operationOptions
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(&request); err != nil {
+			return operationOptions{}, err
+		}
+	}
+	return request, nil
 }
 
 func (s *Service) selectKey(

@@ -11,8 +11,8 @@ package vapi {
 
 package crypto {
     class Service {
-        + Sign(ctx, []byte, SignRequest) (SignResult, error)
-        + VerifySignature(ctx, []byte, VerifyRequest) error
+        + Sign(ctx, []byte, SignOption...) (SignResult, error)
+        + VerifySignature(ctx, []byte, []byte, VerifyOption...) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
@@ -30,10 +30,11 @@ package crypto {
         + Material PublicMaterial
     }
 
-    class SignRequest {
+    class OperationOptions {
         + Owner string
         + Source string
         + Algorithms []KeyAlg
+        + Kid string
     }
 
     class SignResult {
@@ -41,10 +42,6 @@ package crypto {
         + Key KeyDescriptor
     }
 
-    class VerifyRequest {
-        + Key KeyDescriptor
-        + Signature []byte
-    }
 }
 
 package keystore {

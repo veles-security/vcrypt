@@ -77,9 +77,7 @@ func TestServiceSignReturnsSelectedKeyDescriptor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := service.Sign(context.Background(), []byte("message"), SignRequest{
-		Algorithms: []key.KeyAlg{testAlgA, testAlgB},
-	})
+	result, err := service.Sign(context.Background(), []byte("message"), WithAlgorithms(testAlgA, testAlgB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,10 +113,15 @@ func TestServiceVerifySignatureUsesDescriptorAndAllowsPassiveKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = service.VerifySignature(context.Background(), []byte("message"), VerifyRequest{
-		Key:       key.KeyDescriptor{ID: "key-id", Owner: "issuer", Source: "jwks", Algorithm: testAlgA},
-		Signature: []byte("signature"),
-	})
+	err = service.VerifySignature(
+		context.Background(),
+		[]byte("message"),
+		[]byte("signature"),
+		WithKid("key-id"),
+		WithOwner("issuer"),
+		WithSource("jwks"),
+		WithAlgorithms(testAlgA),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +151,7 @@ func TestServiceHonorsKeyRestrictions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = service.Sign(context.Background(), []byte("message"), SignRequest{Algorithms: []key.KeyAlg{testAlgA}})
+	_, err = service.Sign(context.Background(), []byte("message"), WithAlgorithms(testAlgA))
 	if err == nil {
 		t.Fatal("expected restricted key not to be selected")
 	}
