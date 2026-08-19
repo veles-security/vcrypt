@@ -125,10 +125,7 @@ package key {
     Key --> Capability
 }
 
-package builder {
-    class KeyBuilder {
-        + Build(candidate KeyCandidate) Key
-    }
+package key {
     class KeyCandidate {
         material Material
         metadata
@@ -250,8 +247,7 @@ Store o-- Source
 
 Repository o-- Key
 
-KeyBuilder --> Key
-KeyBuilder --> Registry
+Store --> Registry
 
 Backend <|.. RsaBackend
 Backend <|.. EcBackend
@@ -264,7 +260,7 @@ BackendFactory <|.. RsaBackendFactory
 BackendFactory <|.. EcBackendFactory
 BackendFactory <|.. HsmBackendFactory
 
-Source --> KeyBuilder
+Source --> KeyCandidate
 
 KeyCandidate *-- Material
 

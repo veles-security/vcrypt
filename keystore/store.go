@@ -7,9 +7,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/veles-security/vcrypt/backend"
+	_ "github.com/veles-security/vcrypt/backend/ec"
+	_ "github.com/veles-security/vcrypt/backend/hmac"
+	_ "github.com/veles-security/vcrypt/backend/rsa"
 	"github.com/veles-security/vcrypt/key"
-	"github.com/veles-security/vcrypt/keybuilder"
 	"github.com/veles-security/vcrypt/keysource"
+	"github.com/veles-security/vcrypt/material"
 )
 
 type Store interface {
@@ -147,11 +151,18 @@ func (m *store) loadSources(sources []keysource.Source) error {
 func (m *store) buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error) {
 	keys := make([]key.Key, 0, len(candidates))
 	for i, candidate := range candidates {
-		built, err := keybuilder.Build(candidate)
+		keyBackend, err := backend.BackendFor(candidate.Material)
+		// Certificates retain their representation and metadata on Key, while the
+		// cryptographic backend operates on the public key embedded in the cert.
+		if certificate, ok := candidate.Material.(*material.CertificateMaterial); ok &&
+			certificate != nil && certificate.Cert != nil {
+			keyBackend, err = backend.BackendFor(&material.PublicMaterial{Key: certificate.Cert.PublicKey})
+		}
 		if err != nil {
 			return nil, fmt.Errorf("candidate %d: %w", i+1, err)
 		}
-		keys = append(keys, *built)
+
+		keys = append(keys, key.New(candidate, keyBackend))
 	}
 	return keys, nil
 }
