@@ -11,10 +11,39 @@ package vapi {
 
 package crypto {
     class Service {
-        + Sign(ctx, []byte, options...) ([]byte, error)
-        + Verify(ctx, []byte, []byte, options...) error
+        + Sign(ctx, []byte, SignRequest) (SignResult, error)
+        + VerifySignature(ctx, []byte, VerifyRequest) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
+    }
+
+    class KeyDescriptor {
+        + ID string
+        + Owner string
+        + Source string
+        + Algorithm KeyAlg
+        + Restrictions []Capability
+        + Status KeyStatus
+        + Priority int
+        + NotBefore time.Time
+        + NotAfter time.Time
+        + Material PublicMaterial
+    }
+
+    class SignRequest {
+        + Owner string
+        + Source string
+        + Algorithms []KeyAlg
+    }
+
+    class SignResult {
+        + Signature []byte
+        + Key KeyDescriptor
+    }
+
+    class VerifyRequest {
+        + Key KeyDescriptor
+        + Signature []byte
     }
 }
 
@@ -87,8 +116,8 @@ package key {
         + Supports(use, operation, algorithm) bool
         + Capabilities() []Capability
 
-        + Sign(ctx, []byte, options...) ([]byte, error)
-        + Verify(ctx, []byte, []byte, options...) error
+        + Sign(ctx, algorithm, []byte) ([]byte, error)
+        + Verify(ctx, algorithm, []byte, []byte) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
@@ -167,7 +196,7 @@ package scheme.ec {
 
         + Supports(use, operation, algorithm) bool
         + Capabilities() []Capability
-        + Verify(ctx, []byte, []byte, options...) error
+        + Verify(ctx, algorithm, []byte, []byte) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
@@ -184,7 +213,7 @@ package scheme.rsa {
 
         + Supports(use, operation, algorithm) bool
         + Capabilities() []Capability
-        + Verify(ctx, []byte, []byte, options...) error
+        + Verify(ctx, algorithm, []byte, []byte) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }
@@ -207,7 +236,7 @@ package scheme.hsm {
 
         + Supports(use, operation, algorithm) bool
         + Capabilities() []Capability
-        + Verify(ctx, []byte, []byte, options...) error
+        + Verify(ctx, algorithm, []byte, []byte) error
         + Encrypt(ctx, []byte, options...) ([]byte, error)
         + Decrypt(ctx, []byte, options...) ([]byte, error)
     }

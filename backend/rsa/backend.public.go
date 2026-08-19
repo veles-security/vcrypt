@@ -15,12 +15,8 @@ type publicBackend struct {
 	material material.PublicMaterial
 }
 
-func (b *publicBackend) signatureOptions(options ...key.SignOption) (crypto.Hash, bool, error) {
-	if len(options) != 1 {
-		return 0, false, fmt.Errorf("RSA backend: expected 1 signature algorith option, got %d", len(options))
-	}
-	alg := options[0]
-	switch key.KeyAlg(alg) {
+func (b *publicBackend) signatureOptions(alg key.KeyAlg) (crypto.Hash, bool, error) {
+	switch alg {
 	case RS256:
 		return crypto.SHA256, false, nil
 	case RS384:
@@ -44,7 +40,7 @@ func (p *publicBackend) Capabilities() []key.Capability {
 }
 
 // Sign implements [key.Backend].
-func (p *publicBackend) Sign(ctx context.Context, message []byte, options ...key.SignOption) ([]byte, error) {
+func (p *publicBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	return nil, errors.New("RSA backend: unsupported operation")
 }
 
@@ -60,7 +56,7 @@ func (p *publicBackend) Supports(use key.KeyUse, operation key.KeyOperation, alg
 }
 
 // VerifySignature implements [key.Backend].
-func (p *publicBackend) VerifySignature(ctx context.Context, signature []byte, message []byte, options ...key.VerifyOption) error {
+func (p *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -68,10 +64,7 @@ func (p *publicBackend) VerifySignature(ctx context.Context, signature []byte, m
 	if !ok {
 		return fmt.Errorf("RSA backend: key material is not an RSA public key")
 	}
-	if len(options) != 1 {
-		return fmt.Errorf("RSA backend: expected 1 signature algorith option, got %d", len(options))
-	}
-	hash, isPss, err := p.signatureOptions(key.SignOption(options[0]))
+	hash, isPss, err := p.signatureOptions(algorithm)
 	if err != nil {
 		return err
 	}

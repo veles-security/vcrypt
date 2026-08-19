@@ -14,13 +14,9 @@ type symmetricBackend struct {
 	material material.SymmetricMaterial
 }
 
-func (b *symmetricBackend) signatureOptions(options ...key.SignOption) (crypto.Hash, error) {
-	if len(options) != 1 {
-		return 0, fmt.Errorf("HMAC backend: expected 1 signature algorithm option, got %d", len(options))
-	}
-
+func (b *symmetricBackend) signatureOptions(algorithm key.KeyAlg) (crypto.Hash, error) {
 	var hash crypto.Hash
-	switch alg := key.KeyAlg(options[0]); alg {
+	switch alg := algorithm; alg {
 	case HS256:
 		hash = crypto.SHA256
 	case HS384:
@@ -45,11 +41,11 @@ func (b *symmetricBackend) Capabilities() []key.Capability {
 }
 
 // Sign implements [key.Backend].
-func (b *symmetricBackend) Sign(ctx context.Context, message []byte, options ...key.SignOption) ([]byte, error) {
+func (b *symmetricBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	hash, err := b.signatureOptions(options...)
+	hash, err := b.signatureOptions(algorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -69,15 +65,11 @@ func (b *symmetricBackend) Supports(use key.KeyUse, operation key.KeyOperation, 
 }
 
 // VerifySignature implements [key.Backend].
-func (b *symmetricBackend) VerifySignature(ctx context.Context, signature []byte, message []byte, options ...key.VerifyOption) error {
+func (b *symmetricBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	signOptions := make([]key.SignOption, len(options))
-	for i, option := range options {
-		signOptions[i] = key.SignOption(option)
-	}
-	hash, err := b.signatureOptions(signOptions...)
+	hash, err := b.signatureOptions(algorithm)
 	if err != nil {
 		return err
 	}

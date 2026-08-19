@@ -7,6 +7,7 @@ import (
 
 type Material interface {
 	IsMaterial() bool
+	Public() *PublicMaterial
 }
 
 type PrivateMaterial struct {
@@ -18,6 +19,19 @@ func (p *PrivateMaterial) IsMaterial() bool {
 	return true
 }
 
+// Public returns the public part of the private key when it implements
+// [crypto.Signer].
+func (p *PrivateMaterial) Public() *PublicMaterial {
+	if p == nil {
+		return nil
+	}
+	signer, ok := p.Key.(crypto.Signer)
+	if !ok {
+		return nil
+	}
+	return &PublicMaterial{Key: signer.Public()}
+}
+
 type PublicMaterial struct {
 	Key crypto.PublicKey
 }
@@ -25,6 +39,14 @@ type PublicMaterial struct {
 // IsMaterial implements [Material].
 func (p *PublicMaterial) IsMaterial() bool {
 	return true
+}
+
+// Public returns a copy of the public material wrapper.
+func (p *PublicMaterial) Public() *PublicMaterial {
+	if p == nil {
+		return nil
+	}
+	return &PublicMaterial{Key: p.Key}
 }
 
 type CertificateMaterial struct {
@@ -36,6 +58,14 @@ func (c *CertificateMaterial) IsMaterial() bool {
 	return true
 }
 
+// Public returns the public key embedded in the certificate.
+func (c *CertificateMaterial) Public() *PublicMaterial {
+	if c == nil || c.Cert == nil {
+		return nil
+	}
+	return &PublicMaterial{Key: c.Cert.PublicKey}
+}
+
 type SymmetricMaterial struct {
 	Key []byte
 }
@@ -43,6 +73,11 @@ type SymmetricMaterial struct {
 // IsMaterial implements [Material].
 func (s *SymmetricMaterial) IsMaterial() bool {
 	return true
+}
+
+// Public returns nil because symmetric key material has no public part.
+func (s *SymmetricMaterial) Public() *PublicMaterial {
+	return nil
 }
 
 var _ Material = &PrivateMaterial{}

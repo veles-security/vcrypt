@@ -20,7 +20,7 @@ func (b *publicBackend) Capabilities() []key.Capability {
 }
 
 // Sign implements [key.Backend].
-func (b *publicBackend) Sign(ctx context.Context, message []byte, options ...key.SignOption) ([]byte, error) {
+func (b *publicBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	return nil, errors.New("EC backend: unsupported operation")
 }
 
@@ -35,7 +35,7 @@ func (b *publicBackend) Supports(use key.KeyUse, operation key.KeyOperation, alg
 }
 
 // VerifySignature implements [key.Backend].
-func (b *publicBackend) VerifySignature(ctx context.Context, signature []byte, message []byte, options ...key.VerifyOption) error {
+func (b *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -43,11 +43,7 @@ func (b *publicBackend) VerifySignature(ctx context.Context, signature []byte, m
 	if !ok {
 		return fmt.Errorf("EC backend: key material is not an ECDSA public key")
 	}
-	signOptions := make([]key.SignOption, len(options))
-	for i, option := range options {
-		signOptions[i] = key.SignOption(option)
-	}
-	hash, err := signatureOptions(publicKey, signOptions...)
+	hash, err := signatureOptions(publicKey, algorithm)
 	if err != nil {
 		return err
 	}

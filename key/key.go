@@ -83,15 +83,3 @@ func (key Key) Backend() Backend            { return key.backend }
 func (key Key) Restrictions() []Capability {
 	return append([]Capability(nil), key.restrictions...)
 }
-
-type KeyCandidate struct {
-	ID           string
-	Owner        string
-	Source       string
-	Restrictions []Capability
-	Status       KeyStatus
-	Priority     int
-	NotBefore    time.Time
-	NotAfter     time.Time
-	Material     material.Material
-}

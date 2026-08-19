@@ -8,12 +8,7 @@ import (
 	"github.com/veles-security/vcrypt/key"
 )
 
-func signatureOptions(publicKey *ecdsa.PublicKey, options ...key.SignOption) (crypto.Hash, error) {
-	if len(options) != 1 {
-		return 0, fmt.Errorf("EC backend: expected 1 signature algorithm option, got %d", len(options))
-	}
-
-	alg := key.KeyAlg(options[0])
+func signatureOptions(publicKey *ecdsa.PublicKey, alg key.KeyAlg) (crypto.Hash, error) {
 	var hash crypto.Hash
 	var curve string
 	switch alg {

@@ -21,12 +21,8 @@ func (b *privateBackend) Capabilities() []key.Capability {
 	return capabilities[PRIVATE_MATERIAL]
 }
 
-func (b *privateBackend) signatureOptions(options ...key.SignOption) (crypto.Hash, bool, error) {
-	if len(options) != 1 {
-		return 0, false, fmt.Errorf("RSA backend: expected 1 signature algorith option, got %d", len(options))
-	}
-	alg := options[0]
-	switch key.KeyAlg(alg) {
+func (b *privateBackend) signatureOptions(alg key.KeyAlg) (crypto.Hash, bool, error) {
+	switch alg {
 	case RS256:
 		return crypto.SHA256, false, nil
 	case RS384:
@@ -45,7 +41,7 @@ func (b *privateBackend) signatureOptions(options ...key.SignOption) (crypto.Has
 }
 
 // Sign implements [key.Backend].
-func (b *privateBackend) Sign(ctx context.Context, message []byte, options ...key.SignOption) ([]byte, error) {
+func (b *privateBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -53,7 +49,7 @@ func (b *privateBackend) Sign(ctx context.Context, message []byte, options ...ke
 	if !ok {
 		return nil, fmt.Errorf("RSA backend: key material is not an RSA private key")
 	}
-	hash, isPss, err := b.signatureOptions(options...)
+	hash, isPss, err := b.signatureOptions(algorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +77,7 @@ func (b *privateBackend) Supports(use key.KeyUse, operation key.KeyOperation, al
 }
 
 // VerifySignature implements [key.Backend].
-func (b *privateBackend) VerifySignature(ctx context.Context, signature []byte, message []byte, options ...key.VerifyOption) error {
+func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -89,7 +85,7 @@ func (b *privateBackend) VerifySignature(ctx context.Context, signature []byte, 
 	if !ok {
 		return fmt.Errorf("RSA backend: key material is not an RSA private key")
 	}
-	hash, isPss, err := b.signatureOptions(key.SignOption(options[0]))
+	hash, isPss, err := b.signatureOptions(algorithm)
 	if err != nil {
 		return err
 	}

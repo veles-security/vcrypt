@@ -20,7 +20,7 @@ func (b *privateBackend) Capabilities() []key.Capability {
 }
 
 // Sign implements [key.Backend].
-func (b *privateBackend) Sign(ctx context.Context, message []byte, options ...key.SignOption) ([]byte, error) {
+func (b *privateBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func (b *privateBackend) Sign(ctx context.Context, message []byte, options ...ke
 	if !ok {
 		return nil, fmt.Errorf("EC backend: key material is not an ECDSA private key")
 	}
-	hash, err := signatureOptions(&privateKey.PublicKey, options...)
+	hash, err := signatureOptions(&privateKey.PublicKey, algorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (b *privateBackend) Supports(use key.KeyUse, operation key.KeyOperation, al
 }
 
 // VerifySignature implements [key.Backend].
-func (b *privateBackend) VerifySignature(ctx context.Context, signature []byte, message []byte, options ...key.VerifyOption) error {
+func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -58,11 +58,7 @@ func (b *privateBackend) VerifySignature(ctx context.Context, signature []byte, 
 	if !ok {
 		return fmt.Errorf("EC backend: key material is not an ECDSA private key")
 	}
-	signOptions := make([]key.SignOption, len(options))
-	for i, option := range options {
-		signOptions[i] = key.SignOption(option)
-	}
-	hash, err := signatureOptions(&privateKey.PublicKey, signOptions...)
+	hash, err := signatureOptions(&privateKey.PublicKey, algorithm)
 	if err != nil {
 		return err
 	}
