@@ -9,7 +9,7 @@ import (
 
 func New(sources ...keysource.Source) (Store, error) {
 	m := &store{
-		repository: &repository{},
+		repository: NewRepository(),
 		sources:    map[string]keysource.Source{},
 		loading:    map[string]struct{}{},
 	}

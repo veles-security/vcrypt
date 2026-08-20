@@ -20,7 +20,7 @@ type SignResult struct {
 // Sign selects an active key that supports one of the requested algorithms and
 // signs message with it.
 func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
-	request, err := applyRuntimeOptions(options)
+	request, err := applySignerQuery(options)
 	if err != nil {
 		return SignResult{}, fmt.Errorf("vcrypt: apply signing option: %w", err)
 	}
@@ -47,7 +47,7 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 // VerifySignature selects a key and verifies signature. Active and passive
 // keys are eligible for verification.
 func (k *store) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
-	request, err := applyRuntimeOptions(options)
+	request, err := applySignerQuery(options)
 	if err != nil {
 		return fmt.Errorf("vcrypt: apply verification option: %w", err)
 	}

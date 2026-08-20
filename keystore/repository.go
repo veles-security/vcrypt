@@ -17,6 +17,12 @@ type repository struct {
 	keys []key.Key
 }
 
+func NewRepository() Repository {
+	return &repository{
+		keys: []key.Key(nil),
+	}
+}
+
 // Find implements [Repository].
 func (k *repository) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error) {
 	if err := ctx.Err(); err != nil {
