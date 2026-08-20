@@ -2,22 +2,52 @@ package keystore
 
 import "github.com/veles-security/vcrypt/key"
 
-type KeyQueryPredicate func(*key.Key) bool
+// KeySelector identifies keys by their stable metadata. A zero-value selector
+// matches every key.
+type KeySelector struct {
+	ID     string
+	Owner  string
+	Source string
+}
 
-func WithID(kid string) KeyQueryPredicate {
-	return func(candidate *key.Key) bool {
-		return candidate.ID() == kid
+// KeySelectorOption configures a [KeySelector].
+type KeySelectorOption func(*KeySelector)
+
+// Select builds a key selector that can be reused by repository queries and
+// cryptographic operations.
+func Select(options ...KeySelectorOption) KeySelector {
+	var selector KeySelector
+	for _, option := range options {
+		if option != nil {
+			option(&selector)
+		}
+	}
+	return selector
+}
+
+// WithKeyID restricts selection to the key with id.
+func WithKeyID(id string) KeySelectorOption {
+	return func(selector *KeySelector) {
+		selector.ID = id
 	}
 }
 
-func WithOwner(owner string) KeyQueryPredicate {
-	return func(candidate *key.Key) bool {
-		return candidate.Owner() == owner
+// WithKeyOwner restricts selection to keys owned by owner.
+func WithKeyOwner(owner string) KeySelectorOption {
+	return func(selector *KeySelector) {
+		selector.Owner = owner
 	}
 }
 
-func WithSource(source string) KeyQueryPredicate {
-	return func(candidate *key.Key) bool {
-		return candidate.Source() == source
+// WithKeySource restricts selection to keys from source.
+func WithKeySource(source string) KeySelectorOption {
+	return func(selector *KeySelector) {
+		selector.Source = source
 	}
+}
+
+func (selector KeySelector) matches(candidate *key.Key) bool {
+	return (selector.ID == "" || candidate.ID() == selector.ID) &&
+		(selector.Owner == "" || candidate.Owner() == selector.Owner) &&
+		(selector.Source == "" || candidate.Source() == selector.Source)
 }

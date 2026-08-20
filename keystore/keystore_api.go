@@ -22,20 +22,20 @@ type SignResult struct {
 func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
 	request, err := applySignerQuery(options)
 	if err != nil {
-		return SignResult{}, fmt.Errorf("vcrypt: apply signing option: %w", err)
+		return SignResult{}, fmt.Errorf("keystore: apply signing option: %w", err)
 	}
 	if len(request.Algorithms) == 0 {
-		return SignResult{}, fmt.Errorf("vcrypt: signing algorithms are empty")
+		return SignResult{}, fmt.Errorf("keystore: signing algorithms are empty")
 	}
 
-	selected, algorithm, err := k.selectKey(ctx, key.KeyOpSign, request.Owner, request.Source, request.Kid, request.Algorithms)
+	selected, algorithm, err := k.selectKey(ctx, key.KeyOpSign, request.Keys, request.Algorithms)
 	if err != nil {
 		return SignResult{}, err
 	}
 
 	signature, err := selected.Backend().Sign(ctx, algorithm, message)
 	if err != nil {
-		return SignResult{}, fmt.Errorf("vcrypt: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
+		return SignResult{}, fmt.Errorf("keystore: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 
 	return SignResult{
@@ -49,21 +49,19 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 func (k *store) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
 	request, err := applySignerQuery(options)
 	if err != nil {
-		return fmt.Errorf("vcrypt: apply verification option: %w", err)
+		return fmt.Errorf("keystore: apply verification option: %w", err)
 	}
-	if strings.TrimSpace(request.Kid) == "" {
-		return fmt.Errorf("vcrypt: verification key ID is empty")
+	if strings.TrimSpace(request.Keys.ID) == "" {
+		return fmt.Errorf("keystore: verification key ID is empty")
 	}
 	if len(request.Algorithms) == 0 {
-		return fmt.Errorf("vcrypt: verification algorithm is empty")
+		return fmt.Errorf("keystore: verification algorithm is empty")
 	}
 
 	selected, algorithm, err := k.selectKey(
 		ctx,
 		key.KeyOpVerify,
-		request.Owner,
-		request.Source,
-		request.Kid,
+		request.Keys,
 		request.Algorithms,
 	)
 	if err != nil {
@@ -71,7 +69,7 @@ func (k *store) VerifySignature(ctx context.Context, message, signature []byte, 
 	}
 
 	if err := selected.Backend().VerifySignature(ctx, algorithm, signature, message); err != nil {
-		return fmt.Errorf("vcrypt: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
+		return fmt.Errorf("keystore: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 	return nil
 }
@@ -79,28 +77,16 @@ func (k *store) VerifySignature(ctx context.Context, message, signature []byte, 
 func (k *store) selectKey(
 	ctx context.Context,
 	operation key.KeyOperation,
-	owner string,
-	source string,
-	id string,
+	selector KeySelector,
 	algorithms []key.KeyAlg,
 ) (key.Key, key.KeyAlg, error) {
 	if k == nil {
 		return key.Key{}, "", fmt.Errorf("keystore: not initialized")
 	}
 
-	predicates := make([]KeyQueryPredicate, 0, 3)
-	if id != "" {
-		predicates = append(predicates, WithID(id))
-	}
-	if owner != "" {
-		predicates = append(predicates, WithOwner(owner))
-	}
-	if source != "" {
-		predicates = append(predicates, WithSource(source))
-	}
-	candidates, err := k.repository.Find(ctx, predicates...)
+	candidates, err := k.repository.Find(ctx, selector)
 	if err != nil {
-		return key.Key{}, "", fmt.Errorf("vcrypt: find key: %w", err)
+		return key.Key{}, "", fmt.Errorf("keystore: find key: %w", err)
 	}
 
 	// Keep repository order deterministic for equal-priority candidates so a
@@ -121,12 +107,12 @@ func (k *store) selectKey(
 			continue
 		}
 		if len(matches) > 1 && matches[0].Priority() == matches[1].Priority() {
-			return key.Key{}, "", fmt.Errorf("vcrypt: multiple keys with priority %d support operation %q and algorithm %q", matches[0].Priority(), operation, algorithm)
+			return key.Key{}, "", fmt.Errorf("keystore: multiple keys with priority %d support operation %q and algorithm %q", matches[0].Priority(), operation, algorithm)
 		}
 		return matches[0], algorithm, nil
 	}
 
-	return key.Key{}, "", fmt.Errorf("vcrypt: no eligible key supports operation %q and algorithms %v", operation, algorithms)
+	return key.Key{}, "", fmt.Errorf("keystore: no eligible key supports operation %q and algorithms %v", operation, algorithms)
 }
 
 func (k *store) eligible(candidate key.Key, operation key.KeyOperation, algorithm key.KeyAlg, now time.Time) bool {

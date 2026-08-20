@@ -18,6 +18,8 @@ import (
 
 type Store interface {
 	Repository
+	Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error)
+	VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error
 	Bind(source keysource.Source) error
 	RefreshAll() error
 }
@@ -29,11 +31,11 @@ type store struct {
 	sourcesMU  sync.RWMutex
 }
 
-func (m *store) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error) {
-	return m.repository.Find(ctx, conditions...)
+func (m *store) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
+	return m.repository.Find(ctx, selector)
 }
-func (m *store) Replace(ctx context.Context, keys []key.Key, conditions ...KeyQueryPredicate) error {
-	return m.repository.Replace(ctx, keys, conditions...)
+func (m *store) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
+	return m.repository.Replace(ctx, keys, selector)
 }
 
 func (m *store) bindSelfRefreshing(source keysource.Source) {
@@ -44,7 +46,7 @@ func (m *store) bindSelfRefreshing(source keysource.Source) {
 			if err != nil {
 				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
 			}
-			if err := m.repository.Replace(context.Background(), keys, WithSource(id)); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(id))); err != nil {
 				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 			}
 			return nil
@@ -87,7 +89,7 @@ func (m *store) Bind(source keysource.Source) error {
 		}
 	}
 	if err == nil {
-		err = m.repository.Replace(context.Background(), keys, WithSource(id))
+		err = m.repository.Replace(context.Background(), keys, Select(WithKeySource(id)))
 		if err != nil {
 			err = fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 		}
@@ -134,7 +136,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 				errs <- fmt.Errorf("failed to build keys from source %s: %w", source.ID(), err)
 				return
 			}
-			if err := m.repository.Replace(context.Background(), keys, WithSource(source.ID())); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(source.ID()))); err != nil {
 				errs <- fmt.Errorf("failed to store keys from source %s in keystore: %w", source.ID(), err)
 			}
 		}()

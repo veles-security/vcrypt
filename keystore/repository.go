@@ -8,8 +8,8 @@ import (
 )
 
 type Repository interface {
-	Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error)
-	Replace(ctx context.Context, keys []key.Key, conditions ...KeyQueryPredicate) error
+	Find(ctx context.Context, selector KeySelector) ([]key.Key, error)
+	Replace(ctx context.Context, keys []key.Key, selector KeySelector) error
 }
 
 type repository struct {
@@ -24,7 +24,7 @@ func NewRepository() Repository {
 }
 
 // Find implements [Repository].
-func (k *repository) Find(ctx context.Context, conditions ...KeyQueryPredicate) ([]key.Key, error) {
+func (k *repository) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -35,14 +35,7 @@ func (k *repository) Find(ctx context.Context, conditions ...KeyQueryPredicate) 
 	result := make([]key.Key, 0, len(k.keys))
 	for i := range k.keys {
 		candidate := &k.keys[i]
-		matches := true
-		for _, condition := range conditions {
-			if condition != nil && !condition(candidate) {
-				matches = false
-				break
-			}
-		}
-		if matches {
+		if selector.matches(candidate) {
 			result = append(result, *candidate)
 		}
 	}
@@ -50,7 +43,7 @@ func (k *repository) Find(ctx context.Context, conditions ...KeyQueryPredicate) 
 }
 
 // Replace implements [Repository].
-func (k *repository) Replace(ctx context.Context, keys []key.Key, conditions ...KeyQueryPredicate) error {
+func (k *repository) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -61,14 +54,7 @@ func (k *repository) Replace(ctx context.Context, keys []key.Key, conditions ...
 	kept := k.keys[:0]
 	for i := range k.keys {
 		candidate := &k.keys[i]
-		matches := true
-		for _, condition := range conditions {
-			if condition != nil && !condition(candidate) {
-				matches = false
-				break
-			}
-		}
-		if !matches {
+		if !selector.matches(candidate) {
 			kept = append(kept, *candidate)
 		}
 	}
