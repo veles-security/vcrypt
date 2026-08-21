@@ -16,7 +16,13 @@ func Test_privateBackend_Sign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var invalidPrivateKey crypto.PrivateKey = &struct{}{}
+	var invalidAlg key.KeyAlg = "INVALID"
+
 	backend := privateBackend{material: material.PrivateMaterial{Key: privateKey}}
+
+	invalidKeyBackend := privateBackend{material: material.PrivateMaterial{Key: invalidPrivateKey}}
+
 	message := []byte("message to sign")
 	assertValidSignature := func(hash crypto.Hash, pss bool) func(*testing.T, []byte, error) {
 		return func(t *testing.T, signature []byte, err error) {
@@ -35,6 +41,11 @@ func Test_privateBackend_Sign(t *testing.T) {
 			}
 		}
 	}
+	assertError := func(t *testing.T, signature []byte, err error) {
+		if err == nil {
+			t.Errorf("want err, got nil")
+		}
+	}
 	tests := []struct {
 		name      string // description of this test case
 		backend   privateBackend
@@ -48,6 +59,8 @@ func Test_privateBackend_Sign(t *testing.T) {
 		{name: "PS256", backend: backend, algorithm: PS256, message: message, assertion: assertValidSignature(crypto.SHA256, true)},
 		{name: "PS384", backend: backend, algorithm: PS384, message: message, assertion: assertValidSignature(crypto.SHA384, true)},
 		{name: "PS512", backend: backend, algorithm: PS512, message: message, assertion: assertValidSignature(crypto.SHA512, true)},
+		{name: "Invalid KeyAlg", backend: backend, algorithm: invalidAlg, message: message, assertion: assertError},
+		{name: "Invalid Key", backend: invalidKeyBackend, algorithm: RS256, message: message, assertion: assertError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
