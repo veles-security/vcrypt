@@ -13,14 +13,23 @@ type factory struct{}
 
 // New implements [backend.Factory].
 func (f factory) New(m material.Material) (key.Backend, error) {
-	switch material := m.(type) {
+	switch value := m.(type) {
 	case *material.PublicMaterial:
-		if _, ok := material.Key.(*ecdsa.PublicKey); ok {
-			return &publicBackend{material: *material}, nil
+		if _, ok := value.Key.(*ecdsa.PublicKey); ok {
+			return &publicBackend{material: *value}, nil
 		}
 	case *material.PrivateMaterial:
-		if _, ok := material.Key.(*ecdsa.PrivateKey); ok {
-			return &privateBackend{material: *material}, nil
+		if _, ok := value.Key.(*ecdsa.PrivateKey); ok {
+			return &privateBackend{material: *value}, nil
+		}
+	case *material.CertificateMaterial:
+		if value.Cert != nil {
+			if publicKey, ok := value.Cert.PublicKey.(*ecdsa.PublicKey); ok {
+				return &certificateBackend{
+					publicBackend: &publicBackend{material: material.PublicMaterial{Key: publicKey}},
+					material:      *value,
+				}, nil
+			}
 		}
 	}
 
@@ -29,12 +38,18 @@ func (f factory) New(m material.Material) (key.Backend, error) {
 
 // Supports implements [backend.Factory].
 func (f factory) Supports(m material.Material) bool {
-	switch material := m.(type) {
+	switch value := m.(type) {
 	case *material.PrivateMaterial:
-		_, ok := material.Key.(*ecdsa.PrivateKey)
+		_, ok := value.Key.(*ecdsa.PrivateKey)
 		return ok
 	case *material.PublicMaterial:
-		_, ok := material.Key.(*ecdsa.PublicKey)
+		_, ok := value.Key.(*ecdsa.PublicKey)
+		return ok
+	case *material.CertificateMaterial:
+		if value.Cert == nil {
+			return false
+		}
+		_, ok := value.Cert.PublicKey.(*ecdsa.PublicKey)
 		return ok
 	default:
 		return false
