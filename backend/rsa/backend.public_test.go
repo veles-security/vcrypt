@@ -208,3 +208,58 @@ func Test_publicBackend_Encrypt(t *testing.T) {
 	}
 
 }
+
+func Test_publicBackend_Supports(t *testing.T) {
+	// algs
+	var invalidAlg key.KeyAlg = "INVALID"
+	// uses
+	var invalidUse key.KeyUse = "invalid"
+	// operations
+	var invalidOperation key.KeyOperation = "invalid"
+	// backends
+	backend := publicBackend{}
+
+	// assertions
+	assertSupported := func(t *testing.T, supported bool) {
+		if !supported {
+			t.Errorf("Supports() = false, want true")
+		}
+	}
+	assertUnsupported := func(t *testing.T, supported bool) {
+		if supported {
+			t.Errorf("Supports() = true, want false")
+		}
+	}
+	tests := []struct {
+		name      string
+		use       key.KeyUse
+		operation key.KeyOperation
+		algorithm key.KeyAlg
+		assertion func(*testing.T, bool)
+	}{
+		{name: "Verify RS256", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: RS256, assertion: assertSupported},
+		{name: "Verify RS384", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: RS384, assertion: assertSupported},
+		{name: "Verify RS512", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: RS512, assertion: assertSupported},
+		{name: "Verify PS256", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS256, assertion: assertSupported},
+		{name: "Verify PS384", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS384, assertion: assertSupported},
+		{name: "Verify PS512", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS512, assertion: assertSupported},
+		{name: "Encrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSA1_5, assertion: assertSupported},
+		{name: "Encrypt RSA-OAEP", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP, assertion: assertSupported},
+		{name: "Encrypt RSA-OAEP-256", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP256, assertion: assertSupported},
+		{name: "Encrypt RSA-OAEP-384", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP384, assertion: assertSupported},
+		{name: "Encrypt RSA-OAEP-512", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP512, assertion: assertSupported},
+		{name: "Sign RS256", use: key.KeyUseSigning, operation: key.KeyOpSign, algorithm: RS256, assertion: assertUnsupported},
+		{name: "Decrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSA1_5, assertion: assertUnsupported},
+		{name: "Invalid Use", use: invalidUse, operation: key.KeyOpVerify, algorithm: RS256, assertion: assertUnsupported},
+		{name: "Invalid Operation", use: key.KeyUseSigning, operation: invalidOperation, algorithm: RS256, assertion: assertUnsupported},
+		{name: "Invalid Algorithm", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: invalidAlg, assertion: assertUnsupported},
+		{name: "Signing Use With Encrypt Operation", use: key.KeyUseSigning, operation: key.KeyOpEncrypt, algorithm: RSA1_5, assertion: assertUnsupported},
+		{name: "Encryption Use With Verify Operation", use: key.KeyUseEncryption, operation: key.KeyOpVerify, algorithm: RS256, assertion: assertUnsupported},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := backend.Supports(tt.use, tt.operation, tt.algorithm)
+			tt.assertion(t, got)
+		})
+	}
+}
