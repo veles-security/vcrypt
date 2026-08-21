@@ -1,4 +1,4 @@
-package hmac
+package symetric
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ func (f factory) New(m material.Material) (key.Backend, error) {
 	if material, ok := m.(*material.SymmetricMaterial); ok {
 		return &symmetricBackend{material: *material}, nil
 	}
-	return nil, errors.New("HMAC backend: material is not supported")
+	return nil, errors.New("symetric backend: material is not supported")
 }
 
 // Supports implements [backend.Factory].

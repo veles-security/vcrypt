@@ -9,8 +9,8 @@ import (
 
 	"github.com/veles-security/vcrypt/backend"
 	_ "github.com/veles-security/vcrypt/backend/ec"
-	_ "github.com/veles-security/vcrypt/backend/hmac"
 	_ "github.com/veles-security/vcrypt/backend/rsa"
+	_ "github.com/veles-security/vcrypt/backend/symetric"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keysource"
 	"github.com/veles-security/vcrypt/material"
