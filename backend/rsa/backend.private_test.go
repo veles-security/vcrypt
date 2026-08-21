@@ -3,27 +3,29 @@ package rsa
 import (
 	"context"
 	"crypto"
-	"crypto/rand"
 	stdrsa "crypto/rsa"
 	"testing"
 
+	"github.com/veles-security/vcrypt/internal/testkeys"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/material"
 )
 
 func Test_privateBackend_Sign(t *testing.T) {
-	privateKey, err := stdrsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var invalidPrivateKey crypto.PrivateKey = &struct{}{}
+	// algs
 	var invalidAlg key.KeyAlg = "INVALID"
-
+	// keys
+	privateKey := testkeys.Private(t, testkeys.RSA2048).(*stdrsa.PrivateKey)
+	mismatchedPrivateKey := testkeys.Private(t, testkeys.ES256)
+	brokenPrivateKey := testkeys.MalformedPrivate(t, testkeys.RSA2048, testkeys.IncompleteKey)
+	// backends
 	backend := privateBackend{material: material.PrivateMaterial{Key: privateKey}}
-
-	invalidKeyBackend := privateBackend{material: material.PrivateMaterial{Key: invalidPrivateKey}}
-
+	mismatchedKeyBackend := privateBackend{material: material.PrivateMaterial{Key: mismatchedPrivateKey}}
+	brokernKeyBackend := privateBackend{material: material.PrivateMaterial{Key: brokenPrivateKey}}
+	// messages
 	message := []byte("message to sign")
+
+	// assertions
 	assertValidSignature := func(hash crypto.Hash, pss bool) func(*testing.T, []byte, error) {
 		return func(t *testing.T, signature []byte, err error) {
 			if err != nil {
@@ -60,7 +62,8 @@ func Test_privateBackend_Sign(t *testing.T) {
 		{name: "PS384", backend: backend, algorithm: PS384, message: message, assertion: assertValidSignature(crypto.SHA384, true)},
 		{name: "PS512", backend: backend, algorithm: PS512, message: message, assertion: assertValidSignature(crypto.SHA512, true)},
 		{name: "Invalid KeyAlg", backend: backend, algorithm: invalidAlg, message: message, assertion: assertError},
-		{name: "Invalid Key", backend: invalidKeyBackend, algorithm: RS256, message: message, assertion: assertError},
+		{name: "Mismatched Key", backend: mismatchedKeyBackend, algorithm: RS256, message: message, assertion: assertError},
+		{name: "Broken Key", backend: brokernKeyBackend, algorithm: RS256, message: message, assertion: assertError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
