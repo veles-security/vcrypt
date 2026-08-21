@@ -69,7 +69,7 @@ func (b *symmetricBackend) Capabilities() []key.Capability {
 	return capabilities
 }
 
-// Sign implements [key.Backend].
+// Sign implements [key.Signer].
 func (b *symmetricBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (b *symmetricBackend) Supports(use key.KeyUse, operation key.KeyOperation, 
 	return false
 }
 
-// VerifySignature implements [key.Backend].
+// VerifySignature implements [key.SignatureVerifier].
 func (b *symmetricBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -110,7 +110,7 @@ func (b *symmetricBackend) VerifySignature(ctx context.Context, algorithm key.Ke
 	return nil
 }
 
-// Encrypt implements [key.Backend].
+// Encrypt implements [key.Encrypter].
 func (b *symmetricBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (b *symmetricBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, pl
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-// Decrypt implements [key.Backend].
+// Decrypt implements [key.Decrypter].
 func (b *symmetricBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -147,3 +147,7 @@ func (b *symmetricBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ci
 }
 
 var _ key.Backend = &symmetricBackend{}
+var _ key.Signer = &symmetricBackend{}
+var _ key.SignatureVerifier = &symmetricBackend{}
+var _ key.Encrypter = &symmetricBackend{}
+var _ key.Decrypter = &symmetricBackend{}

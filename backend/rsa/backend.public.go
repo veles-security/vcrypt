@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	stdrsa "crypto/rsa"
-	"errors"
 	"fmt"
 
 	"github.com/veles-security/vcrypt/key"
@@ -39,11 +38,6 @@ func (p *publicBackend) Capabilities() []key.Capability {
 	return capabilities[PUBLIC_MATERIAL]
 }
 
-// Sign implements [key.Backend].
-func (p *publicBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
-	return nil, errors.New("RSA backend: unsupported operation")
-}
-
 // Supports implements [key.Backend].
 func (p *publicBackend) Supports(use key.KeyUse, operation key.KeyOperation, algorithm key.KeyAlg) bool {
 	for _, capability := range capabilities[PUBLIC_MATERIAL] {
@@ -55,7 +49,7 @@ func (p *publicBackend) Supports(use key.KeyUse, operation key.KeyOperation, alg
 	return false
 }
 
-// VerifySignature implements [key.Backend].
+// VerifySignature implements [key.SignatureVerifier].
 func (p *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -80,7 +74,7 @@ func (p *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAl
 	return stdrsa.VerifyPKCS1v15(publicKey, hash, digest, signature)
 }
 
-// Encrypt implements [key.Backend].
+// Encrypt implements [key.Encrypter].
 func (p *publicBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -92,9 +86,6 @@ func (p *publicBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plain
 	return encrypt(publicKey, algorithm, plaintext)
 }
 
-// Decrypt implements [key.Backend].
-func (p *publicBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
-	return nil, errors.New("RSA backend: unsupported operation")
-}
-
 var _ key.Backend = &publicBackend{}
+var _ key.SignatureVerifier = &publicBackend{}
+var _ key.Encrypter = &publicBackend{}

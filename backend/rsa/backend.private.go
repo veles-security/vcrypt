@@ -40,7 +40,7 @@ func (b *privateBackend) signatureOptions(alg key.KeyAlg) (crypto.Hash, bool, er
 	}
 }
 
-// Sign implements [key.Backend].
+// Sign implements [key.Signer].
 func (b *privateBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (b *privateBackend) Supports(use key.KeyUse, operation key.KeyOperation, al
 	return false
 }
 
-// VerifySignature implements [key.Backend].
+// VerifySignature implements [key.SignatureVerifier].
 func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -101,7 +101,7 @@ func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyA
 	return stdrsa.VerifyPKCS1v15(&privateKey.PublicKey, hash, digest, signature)
 }
 
-// Encrypt implements [key.Backend].
+// Encrypt implements [key.Encrypter].
 func (b *privateBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (b *privateBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, plai
 	return encrypt(&privateKey.PublicKey, algorithm, plaintext)
 }
 
-// Decrypt implements [key.Backend].
+// Decrypt implements [key.Decrypter].
 func (b *privateBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -126,3 +126,7 @@ func (b *privateBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ciph
 }
 
 var _ key.Backend = &privateBackend{}
+var _ key.Signer = &privateBackend{}
+var _ key.SignatureVerifier = &privateBackend{}
+var _ key.Encrypter = &privateBackend{}
+var _ key.Decrypter = &privateBackend{}

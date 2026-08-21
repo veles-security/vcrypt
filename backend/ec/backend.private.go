@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"errors"
 	"fmt"
 
 	"github.com/veles-security/vcrypt/key"
@@ -20,7 +19,7 @@ func (b *privateBackend) Capabilities() []key.Capability {
 	return capabilities[PRIVATE_MATERIAL]
 }
 
-// Sign implements [key.Backend].
+// Sign implements [key.Signer].
 func (b *privateBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -50,7 +49,7 @@ func (b *privateBackend) Supports(use key.KeyUse, operation key.KeyOperation, al
 	return false
 }
 
-// VerifySignature implements [key.Backend].
+// VerifySignature implements [key.SignatureVerifier].
 func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -73,14 +72,6 @@ func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyA
 	return nil
 }
 
-// Encrypt implements [key.Backend].
-func (b *privateBackend) Encrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
-	return nil, errors.New("EC backend: unsupported operation")
-}
-
-// Decrypt implements [key.Backend].
-func (b *privateBackend) Decrypt(context.Context, key.KeyAlg, []byte) ([]byte, error) {
-	return nil, errors.New("EC backend: unsupported operation")
-}
-
 var _ key.Backend = &privateBackend{}
+var _ key.Signer = &privateBackend{}
+var _ key.SignatureVerifier = &privateBackend{}

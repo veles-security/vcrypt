@@ -33,7 +33,11 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 		return SignResult{}, err
 	}
 
-	signature, err := selected.Backend().Sign(ctx, algorithm, message)
+	signer, ok := selected.Backend().(key.Signer)
+	if !ok {
+		return SignResult{}, fmt.Errorf("keystore: backend for key %q does not implement signing", selected.ID())
+	}
+	signature, err := signer.Sign(ctx, algorithm, message)
 	if err != nil {
 		return SignResult{}, fmt.Errorf("keystore: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
@@ -68,7 +72,11 @@ func (k *store) VerifySignature(ctx context.Context, message, signature []byte, 
 		return err
 	}
 
-	if err := selected.Backend().VerifySignature(ctx, algorithm, signature, message); err != nil {
+	verifier, ok := selected.Backend().(key.SignatureVerifier)
+	if !ok {
+		return fmt.Errorf("keystore: backend for key %q does not implement signature verification", selected.ID())
+	}
+	if err := verifier.VerifySignature(ctx, algorithm, signature, message); err != nil {
 		return fmt.Errorf("keystore: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 	return nil

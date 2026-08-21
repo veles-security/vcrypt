@@ -16,47 +16,6 @@ import (
 	"github.com/veles-security/vcrypt/material"
 )
 
-func Test_publicBackend_Sign(t *testing.T) {
-	// algs
-	var invalidAlg key.KeyAlg = "INVALID"
-	// backends
-	backend := publicBackend{}
-	// messages
-	message := []byte("message to sign")
-
-	// assertions
-	assertUnsupported := func(t *testing.T, signature []byte, err error) {
-		if err == nil {
-			t.Errorf("want err, got nil")
-		}
-		if signature != nil {
-			t.Errorf("Sign() signature = %x, want nil", signature)
-		}
-	}
-	tests := []struct {
-		name      string
-		backend   publicBackend
-		algorithm key.KeyAlg
-		message   []byte
-		assertion func(*testing.T, []byte, error)
-	}{
-		{name: "RS256", backend: backend, algorithm: RS256, message: message, assertion: assertUnsupported},
-		{name: "RS384", backend: backend, algorithm: RS384, message: message, assertion: assertUnsupported},
-		{name: "RS512", backend: backend, algorithm: RS512, message: message, assertion: assertUnsupported},
-		{name: "PS256", backend: backend, algorithm: PS256, message: message, assertion: assertUnsupported},
-		{name: "PS384", backend: backend, algorithm: PS384, message: message, assertion: assertUnsupported},
-		{name: "PS512", backend: backend, algorithm: PS512, message: message, assertion: assertUnsupported},
-		{name: "Invalid KeyAlg", backend: backend, algorithm: invalidAlg, message: message, assertion: assertUnsupported},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := tt.backend.Sign(context.Background(), tt.algorithm, tt.message)
-			tt.assertion(t, got, gotErr)
-		})
-	}
-
-}
-
 func Test_publicBackend_VerifySignature(t *testing.T) {
 	// algs
 	var invalidAlg key.KeyAlg = "INVALID"
