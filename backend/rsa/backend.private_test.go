@@ -227,3 +227,84 @@ func Test_privateBackend_Encrypt(t *testing.T) {
 	}
 
 }
+
+func Test_privateBackend_Decrypt(t *testing.T) {
+	// algs
+	var invalidAlg key.KeyAlg = "INVALID"
+	// keys
+	privateKey := testkeys.Private(t, testkeys.RSA2048).(*stdrsa.PrivateKey)
+	mismatchedPrivateKey := testkeys.Private(t, testkeys.ES256)
+	brokenPrivateKey := testkeys.MalformedPrivate(t, testkeys.RSA2048, testkeys.IncompleteKey)
+	// backends
+	backend := privateBackend{material: material.PrivateMaterial{Key: privateKey}}
+	mismatchedKeyBackend := privateBackend{material: material.PrivateMaterial{Key: mismatchedPrivateKey}}
+	brokenKeyBackend := privateBackend{material: material.PrivateMaterial{Key: brokenPrivateKey}}
+	// plaintexts
+	plaintext := []byte("message to decrypt")
+	// ciphertexts
+	encrypt := func(algorithm key.KeyAlg) []byte {
+		var ciphertext []byte
+		var err error
+		switch algorithm {
+		case RSA1_5:
+			ciphertext, err = stdrsa.EncryptPKCS1v15(rand.Reader, &privateKey.PublicKey, plaintext)
+		case RSAOAEP:
+			ciphertext, err = stdrsa.EncryptOAEP(sha1.New(), rand.Reader, &privateKey.PublicKey, plaintext, nil)
+		case RSAOAEP256:
+			ciphertext, err = stdrsa.EncryptOAEP(sha256.New(), rand.Reader, &privateKey.PublicKey, plaintext, nil)
+		case RSAOAEP384:
+			ciphertext, err = stdrsa.EncryptOAEP(sha512.New384(), rand.Reader, &privateKey.PublicKey, plaintext, nil)
+		case RSAOAEP512:
+			ciphertext, err = stdrsa.EncryptOAEP(sha512.New(), rand.Reader, &privateKey.PublicKey, plaintext, nil)
+		}
+		if err != nil {
+			t.Fatalf("create test ciphertext: %v", err)
+		}
+		return ciphertext
+	}
+	rsa1_5Ciphertext := encrypt(RSA1_5)
+	rsaOAEPCiphertext := encrypt(RSAOAEP)
+	rsaOAEP256Ciphertext := encrypt(RSAOAEP256)
+	rsaOAEP384Ciphertext := encrypt(RSAOAEP384)
+	rsaOAEP512Ciphertext := encrypt(RSAOAEP512)
+
+	// assertions
+	assertDecrypted := func(t *testing.T, decrypted []byte, err error) {
+		if err != nil {
+			t.Fatalf("Decrypt() error = %v", err)
+		}
+		if !bytes.Equal(decrypted, plaintext) {
+			t.Errorf("Decrypt() = %q, want %q", decrypted, plaintext)
+		}
+	}
+	assertError := func(t *testing.T, decrypted []byte, err error) {
+		if err == nil {
+			t.Errorf("want err, got nil")
+		}
+	}
+	tests := []struct {
+		name       string
+		backend    privateBackend
+		algorithm  key.KeyAlg
+		ciphertext []byte
+		assertion  func(*testing.T, []byte, error)
+	}{
+		{name: "RSA1_5", backend: backend, algorithm: RSA1_5, ciphertext: rsa1_5Ciphertext, assertion: assertDecrypted},
+		{name: "RSA-OAEP", backend: backend, algorithm: RSAOAEP, ciphertext: rsaOAEPCiphertext, assertion: assertDecrypted},
+		{name: "RSA-OAEP-256", backend: backend, algorithm: RSAOAEP256, ciphertext: rsaOAEP256Ciphertext, assertion: assertDecrypted},
+		{name: "RSA-OAEP-384", backend: backend, algorithm: RSAOAEP384, ciphertext: rsaOAEP384Ciphertext, assertion: assertDecrypted},
+		{name: "RSA-OAEP-512", backend: backend, algorithm: RSAOAEP512, ciphertext: rsaOAEP512Ciphertext, assertion: assertDecrypted},
+		{name: "Invalid KeyAlg", backend: backend, algorithm: invalidAlg, ciphertext: rsa1_5Ciphertext, assertion: assertError},
+		{name: "Invalid Ciphertext", backend: backend, algorithm: RSA1_5, ciphertext: []byte("invalid"), assertion: assertError},
+		{name: "Wrong Algorithm", backend: backend, algorithm: RSAOAEP256, ciphertext: rsaOAEPCiphertext, assertion: assertError},
+		{name: "Mismatched Key", backend: mismatchedKeyBackend, algorithm: RSA1_5, ciphertext: rsa1_5Ciphertext, assertion: assertError},
+		{name: "Broken Key", backend: brokenKeyBackend, algorithm: RSA1_5, ciphertext: rsa1_5Ciphertext, assertion: assertError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.backend.Decrypt(context.Background(), tt.algorithm, tt.ciphertext)
+			tt.assertion(t, got, gotErr)
+		})
+	}
+
+}
