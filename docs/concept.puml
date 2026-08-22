@@ -1,267 +1,171 @@
-@startuml "concept"
+@startuml "vcrypt concept"
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty members
 
 package vapi {
-    interface Reader {
-        + ReadArtifact[A,C,O](ctx context.Context, carrier C, options ...O) (A, error)
-    }
-    interface Decoder {
-        + Decode[A,O](ctx context.Context, encoded []byte, options ...O) (A, error)
-    }
-}
-
-package crypto {
-    class Service {
-        + Sign(ctx, []byte, SignOption...) (SignResult, error)
-        + VerifySignature(ctx, []byte, []byte, VerifyOption...) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
-    }
-
-    class KeyDescriptor {
-        + ID string
-        + Owner string
-        + Source string
-        + Algorithm KeyAlg
-        + Restrictions []Capability
-        + Status KeyStatus
-        + Priority int
-        + NotBefore time.Time
-        + NotAfter time.Time
-        + Material PublicMaterial
-    }
-
-    class OperationOptions {
-        + Owner string
-        + Source string
-        + Algorithms []KeyAlg
-        + Kid string
-    }
-
-    class SignResult {
-        + Signature []byte
-        + Key KeyDescriptor
-    }
-
-}
-
-package keystore {
-    class Store {
-        + Load(ctx) error
-        + Reload(ctx) error
-        + Sources() []Source
-        + Repository() Repository
-    }
-
-    interface Repository {
-        + Find(query KeyQuery) []Key
-        + Replace(keys []Key, query KeyQuery) []Key
-    }
-
-    class KeyQuery {
-        + ID KeyID
-        + Use Use
-        + Operation Operation
-        + Algorithm Algorithm
-    }
-}
-
-package source {
-    interface Source {
-        + Load(ctx) []Key
-        + Reload(ctx) []Key
-    }
-
-    class FileSource {
-        + Load(ctx) []Key
-        + Reload(ctx) []Key
-    }
-
-    class JwksSource {
-        + Load(ctx) []Key
-        + Reload(ctx) []Key
-    }
-
-    class HsmSource {
-        + Load(ctx) []Key
-        + Reload(ctx) []Key
-    }
-
-    Source <|.. FileSource
-    Source <|.. JwksSource
-    Source <|.. HsmSource
-}
-
-
-package key {
-    class Key {
-        + Status
-        + Priority
-        + NotBefore
-        + NotAfter
-        + ID() KeyID
-        + Owner() string
-        + Source() string
-        + Restrictions []Capability
-        + Backend() Backend
-    }
-    class Capability {
-        + Use KeyUse
-        + Operation KeyOp
-        + Algorithm KeyAlg
-    }
-    interface Backend {
-        + Supports(use, operation, algorithm) bool
-        + Capabilities() []Capability
-
-        + Sign(ctx, algorithm, []byte) ([]byte, error)
-        + Verify(ctx, algorithm, []byte, []byte) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
-    }
-    Key *-- Backend
-    Key --> Capability
+    interface "Encoder<A, O>" as VapiEncoder
+    interface "Decoder<A, O>" as VapiDecoder
+    interface Artifact
 }
 
 package key {
     class KeyCandidate {
-        material Material
-        metadata
+        + ID string
+        + Source string
+        + Status KeyStatus
+        + Material Material
     }
-}
 
-package reader {
-    class JwksReader {
-        + ReadArtifact(ctx, carrier http.Response, options ...O) ([]KeyCandidate, error)
+    class Key {
+        + ID() string
+        + Material() Material
+        + Backend() Backend
     }
-    class FileReader {
-        + ReadArtifact(ctx, carrier Path, options ...O) ([]KeyCandidate, error)
+
+    interface Backend {
+        + Supports(use, operation, algorithm) bool
+        + Capabilities() []Capability
     }
-    Reader <|.. JwksReader
-    Reader <|.. FileReader
+
+    interface JOSEEncoder {
+        + Encode(ctx, Key, options) []byte
+        + SupportsMaterial(Material) bool
+    }
+
+    interface JOSEDecoder {
+        + Decode(ctx, encoded, options) KeyCandidate
+        + SupportsJOSEKeyType(kty) bool
+    }
+
+    Key *-- Backend
 }
 
 package material {
-    interface Material {
-        Kind()
-    }
-    class PublicMaterial {
-        key PublicKey
-    }
-    class PrivateMaterial {
-        key PrivateKey
-    }
-    class SymetricMaterial {
-        key PrivateKey
-    }
+    interface Material
+    class PublicMaterial
+    class PrivateMaterial
+    class CertificateMaterial
+    class SymmetricMaterial
+
     Material <|.. PublicMaterial
     Material <|.. PrivateMaterial
-    Material <|.. SymetricMaterial
+    Material <|.. CertificateMaterial
+    Material <|.. SymmetricMaterial
 }
 
-package decoder {
-    class DecoderRegistry {
-        - decoders []Decoder[KeyCandidate,O]
-        + Register(decoder Decoder[KeyCandidate,O])
-        + Decode(keyType, encoded []byte) (KeyCandidate, error)
+KeyCandidate --> Material
+Key --> Material
+Artifact <|.. KeyCandidate
+Artifact <|.. Key
+VapiEncoder <|-- JOSEEncoder
+VapiDecoder <|-- JOSEDecoder
+
+package descriptor {
+    class "JWKS<A>" as JWKS {
+        + Keys []A
+        + Kind() string
     }
+
+    class JWKSEncoder {
+        + Encode(ctx, JWKS<Key>, options) []byte
+    }
+
+    class JWKSDecoder {
+        + Decode(ctx, encoded, options) JWKS<KeyCandidate>
+    }
+
+    Artifact <|.. JWKS
+    VapiEncoder <|.. JWKSEncoder
+    VapiDecoder <|.. JWKSDecoder
+    JWKSEncoder --> JWKS
+    JWKSDecoder --> JWKS
 }
 
 package backend {
-    class Registry {
-        - backends []BackendFactory
-        + Register(backend BackendFactory)
-        + BackendFor(material Material) Backend
+    interface Factory {
+        + Supports(Material) bool
+        + New(Material) Backend
     }
 
-    interface BackendFactory {
-        + Supports(m Material) bool
-        + New(material Material) Backend
+    class "Backend registry" as BackendRegistry {
+        + Regsiter(Factory)
+        + BackendFor(Material) Backend
     }
+
+    class "Codec registry" as CodecRegistry {
+        + RegisterJOSEEncoder(JOSEEncoder)
+        + RegisterJOSEDecoder(JOSEDecoder)
+        + JOSEEncoderFor(Material) JOSEEncoder
+        + JOSEDecoderFor(kty) JOSEDecoder
+    }
+
+    BackendRegistry o-- Factory
+    CodecRegistry o-- JOSEEncoder
+    CodecRegistry o-- JOSEDecoder
 }
 
-package scheme.ec {
-    class EcBackendFactory {
-        + Supports(m Material) bool
-        + New(material Material) EcBackend
-    }
+JWKSEncoder --> CodecRegistry : selects by material
+JWKSDecoder --> CodecRegistry : selects by kty
 
-    class EcBackend {
-        - material Material
-
-        + Supports(use, operation, algorithm) bool
-        + Capabilities() []Capability
-        + Verify(ctx, algorithm, []byte, []byte) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
-    }
+package "backend implementations" {
+    class "RSA components" as RSA
+    class "EC components" as EC
+    class "symmetric components" as Symmetric
 }
 
-package scheme.rsa {
-    class RsaBackendFactory {
-        + Supports(m Material) bool
-        + New(material Material) RsaBackend
+Factory <|.. RSA
+Factory <|.. EC
+Factory <|.. Symmetric
+Backend <|.. RSA
+Backend <|.. EC
+Backend <|.. Symmetric
+JOSEEncoder <|.. RSA
+JOSEDecoder <|.. RSA
+
+package keysource {
+    interface Source {
+        + ID() string
+        + Load() []KeyCandidate
     }
 
-    class RsaBackend {
-        - material Material
-
-        + Supports(use, operation, algorithm) bool
-        + Capabilities() []Capability
-        + Verify(ctx, algorithm, []byte, []byte) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    interface SelfRefreshingSource {
+        + SetRefreshCallback(func([]KeyCandidate) error)
     }
 
-    class RsaDecoder {
-        Decode(ctx, encoded []byte, options ...O) (KeyCandidate, error)
-    }
-    Decoder <|.. RsaDecoder
-    RsaDecoder --> DecoderRegistry : Register()
+    class FileSource
+    class RandomSource
+    class JWKSSource
+
+    Source <|-- SelfRefreshingSource
+    SelfRefreshingSource <|.. FileSource
+    SelfRefreshingSource <|.. RandomSource
+    SelfRefreshingSource <|.. JWKSSource
+    Source --> KeyCandidate : loads
+    JWKSSource --> JWKSDecoder : uses
 }
 
-package scheme.hsm {
-    class HsmBackendFactory {
-        + Supports(m Material) bool
-        + New(material Material) HsmBackend
+package keystore {
+    interface Repository {
+        + Find(ctx, selector) []Key
+        + Replace(ctx, keys, selector) error
     }
 
-    class HsmBackend {
-        - material Material
-
-        + Supports(use, operation, algorithm) bool
-        + Capabilities() []Capability
-        + Verify(ctx, algorithm, []byte, []byte) error
-        + Encrypt(ctx, []byte, options...) ([]byte, error)
-        + Decrypt(ctx, []byte, options...) ([]byte, error)
+    class Store {
+        + Bind(Source) error
+        + RefreshAll() error
+        + Sign(ctx, message, options) SignResult
+        + VerifySignature(ctx, message, signature, options) error
     }
+
+    Store *-- Repository
+    Store o-- Source
 }
 
-Service o-- Store
-
-Store o-- Repository
-Store o-- Source
-
-
+Store --> BackendRegistry : builds candidates
 Repository o-- Key
-
-Store --> Registry
-
-Backend <|.. RsaBackend
-Backend <|.. EcBackend
-Backend <|.. HsmBackend
-
-
-Registry o-- BackendFactory
-
-BackendFactory <|.. RsaBackendFactory
-BackendFactory <|.. EcBackendFactory
-BackendFactory <|.. HsmBackendFactory
-
-Source --> KeyCandidate
-
-KeyCandidate *-- Material
-
-JwksReader --> DecoderRegistry
-JwksSource --> JwksReader
 
 @enduml
