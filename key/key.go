@@ -56,6 +56,11 @@ type Key struct {
 	backend  Backend
 }
 
+// Kind implements [vapi.Artifact].
+func (key Key) Kind() string {
+	return "key"
+}
+
 func New(candidate KeyCandidate, backend Backend) Key {
 	return Key{
 		id:           candidate.ID,

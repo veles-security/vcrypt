@@ -17,3 +17,8 @@ type KeyCandidate struct {
 	NotAfter     time.Time
 	Material     material.Material
 }
+
+// Kind implements [vapi.Artifact].
+func (candidate KeyCandidate) Kind() string {
+	return "key_candidate"
+}
