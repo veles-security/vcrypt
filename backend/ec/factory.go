@@ -60,4 +60,6 @@ var _ backend.Factory = factory{}
 
 func init() {
 	backend.Regsiter(&factory{})
+	backend.RegisterJOSEEncoder(NewJOSEEncoder())
+	backend.RegisterJOSEDecoder(NewJOSEDecoder())
 }
