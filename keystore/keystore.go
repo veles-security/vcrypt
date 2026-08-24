@@ -19,6 +19,8 @@ type Store interface {
 	Repository
 	Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error)
 	VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error
+	Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error)
+	Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error)
 	Bind(source keysource.Source) error
 	RefreshAll() error
 }

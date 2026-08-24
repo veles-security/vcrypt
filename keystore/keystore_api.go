@@ -20,7 +20,7 @@ type SignResult struct {
 // Sign selects an active key that supports one of the requested algorithms and
 // signs message with it.
 func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
-	request, err := applySignerQuery(options)
+	request, err := applyOperationQuery(options)
 	if err != nil {
 		return SignResult{}, fmt.Errorf("keystore: apply signing option: %w", err)
 	}
@@ -51,7 +51,7 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 // VerifySignature selects a key and verifies signature. Active and passive
 // keys are eligible for verification.
 func (k *store) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
-	request, err := applySignerQuery(options)
+	request, err := applyOperationQuery(options)
 	if err != nil {
 		return fmt.Errorf("keystore: apply verification option: %w", err)
 	}
@@ -80,6 +80,67 @@ func (k *store) VerifySignature(ctx context.Context, message, signature []byte, 
 		return fmt.Errorf("keystore: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 	return nil
+}
+
+// EncryptResult contains the ciphertext and the exact key selection made by
+// the service.
+type EncryptResult struct {
+	Ciphertext []byte
+	Key        key.KeyDescriptor
+}
+
+// Encrypt selects an active key that supports one of the requested algorithms
+// and encrypts plaintext with it.
+func (k *store) Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error) {
+	request, err := applyOperationQuery(options)
+	if err != nil {
+		return EncryptResult{}, fmt.Errorf("keystore: apply encryption option: %w", err)
+	}
+	if len(request.Algorithms) == 0 {
+		return EncryptResult{}, fmt.Errorf("keystore: encryption algorithms are empty")
+	}
+
+	selected, algorithm, err := k.selectKey(ctx, key.KeyOpEncrypt, request.Keys, request.Algorithms)
+	if err != nil {
+		return EncryptResult{}, err
+	}
+	encrypter, ok := selected.Backend().(key.Encrypter)
+	if !ok {
+		return EncryptResult{}, fmt.Errorf("keystore: backend for key %q does not implement encryption", selected.ID())
+	}
+	ciphertext, err := encrypter.Encrypt(ctx, algorithm, plaintext)
+	if err != nil {
+		return EncryptResult{}, fmt.Errorf("keystore: encrypt with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
+	}
+	return EncryptResult{Ciphertext: ciphertext, Key: selected.Descriptor(algorithm)}, nil
+}
+
+// Decrypt selects an active or passive key and decrypts ciphertext with it.
+func (k *store) Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error) {
+	request, err := applyOperationQuery(options)
+	if err != nil {
+		return nil, fmt.Errorf("keystore: apply decryption option: %w", err)
+	}
+	if strings.TrimSpace(request.Keys.ID) == "" {
+		return nil, fmt.Errorf("keystore: decryption key ID is empty")
+	}
+	if len(request.Algorithms) == 0 {
+		return nil, fmt.Errorf("keystore: decryption algorithms are empty")
+	}
+
+	selected, algorithm, err := k.selectKey(ctx, key.KeyOpDecrypt, request.Keys, request.Algorithms)
+	if err != nil {
+		return nil, err
+	}
+	decrypter, ok := selected.Backend().(key.Decrypter)
+	if !ok {
+		return nil, fmt.Errorf("keystore: backend for key %q does not implement decryption", selected.ID())
+	}
+	plaintext, err := decrypter.Decrypt(ctx, algorithm, ciphertext)
+	if err != nil {
+		return nil, fmt.Errorf("keystore: decrypt with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
+	}
+	return plaintext, nil
 }
 
 func (k *store) selectKey(
@@ -127,7 +188,7 @@ func (k *store) eligible(candidate key.Key, operation key.KeyOperation, algorith
 	if candidate.Backend() == nil {
 		return false
 	}
-	if operation == key.KeyOpSign {
+	if operation == key.KeyOpSign || operation == key.KeyOpEncrypt {
 		if candidate.Status() != key.KeyStatusActive {
 			return false
 		}
@@ -140,7 +201,8 @@ func (k *store) eligible(candidate key.Key, operation key.KeyOperation, algorith
 	if !candidate.NotAfter().IsZero() && now.After(candidate.NotAfter()) {
 		return false
 	}
-	if !candidate.Backend().Supports(key.KeyUseSigning, operation, algorithm) {
+	use := useForOperation(operation)
+	if !candidate.Backend().Supports(use, operation, algorithm) {
 		return false
 	}
 
@@ -149,9 +211,16 @@ func (k *store) eligible(candidate key.Key, operation key.KeyOperation, algorith
 		return true
 	}
 	for _, restriction := range restrictions {
-		if restriction.Use == key.KeyUseSigning && restriction.Operation == operation && restriction.Algorithm == algorithm {
+		if restriction.Use == use && restriction.Operation == operation && restriction.Algorithm == algorithm {
 			return true
 		}
 	}
 	return false
+}
+
+func useForOperation(operation key.KeyOperation) key.KeyUse {
+	if operation == key.KeyOpEncrypt || operation == key.KeyOpDecrypt {
+		return key.KeyUseEncryption
+	}
+	return key.KeyUseSigning
 }
