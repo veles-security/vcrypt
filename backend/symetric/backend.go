@@ -115,6 +115,9 @@ func (b *symmetricBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, pl
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if algorithm == DES2ECB || algorithm == DES2CBC {
+		return unsafeEncrypt(b.material.Key, algorithm, plaintext)
+	}
 	gcm, err := b.encryptionOptions(algorithm)
 	if err != nil {
 		return nil, err
@@ -130,6 +133,9 @@ func (b *symmetricBackend) Encrypt(ctx context.Context, algorithm key.KeyAlg, pl
 func (b *symmetricBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if algorithm == DES2ECB || algorithm == DES2CBC {
+		return unsafeDecrypt(b.material.Key, algorithm, ciphertext)
 	}
 	gcm, err := b.encryptionOptions(algorithm)
 	if err != nil {

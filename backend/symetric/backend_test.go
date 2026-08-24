@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/des"
 	"crypto/rand"
 	"testing"
 
@@ -19,10 +20,12 @@ func Test_symmetricBackend_Encrypt(t *testing.T) {
 	key128 := bytes.Repeat([]byte{0x01}, 16)
 	key192 := bytes.Repeat([]byte{0x02}, 24)
 	key256 := bytes.Repeat([]byte{0x03}, 32)
+	keyDES2 := []byte("12345678abcdefgh")
 	// backends
 	backend128 := symmetricBackend{material: material.SymmetricMaterial{Key: key128}}
 	backend192 := symmetricBackend{material: material.SymmetricMaterial{Key: key192}}
 	backend256 := symmetricBackend{material: material.SymmetricMaterial{Key: key256}}
+	backendDES2 := symmetricBackend{material: material.SymmetricMaterial{Key: keyDES2}}
 	// plaintexts
 	plaintext := []byte("message to encrypt")
 	// contexts
@@ -64,6 +67,21 @@ func Test_symmetricBackend_Encrypt(t *testing.T) {
 			t.Errorf("Encrypt() ciphertext = %x, want nil", ciphertext)
 		}
 	}
+	assertDES2 := assertError
+	if unsafeCryptoEnabled {
+		assertDES2 = func(t *testing.T, ciphertext []byte, err error) {
+			if err != nil {
+				t.Fatalf("Encrypt() error = %v", err)
+			}
+			decrypted, err := decryptDES2ForTest(keyDES2, ciphertext)
+			if err != nil {
+				t.Fatalf("independent DES2 decryption failed: %v", err)
+			}
+			if !bytes.Equal(decrypted, plaintext) {
+				t.Errorf("decrypted plaintext = %q, want %q", decrypted, plaintext)
+			}
+		}
+	}
 	tests := []struct {
 		name      string
 		ctx       context.Context
@@ -74,6 +92,16 @@ func Test_symmetricBackend_Encrypt(t *testing.T) {
 		{name: "A128GCM", ctx: context.Background(), backend: backend128, algorithm: A128GCM, assertion: assertEncrypted(key128)},
 		{name: "A192GCM", ctx: context.Background(), backend: backend192, algorithm: A192GCM, assertion: assertEncrypted(key192)},
 		{name: "A256GCM", ctx: context.Background(), backend: backend256, algorithm: A256GCM, assertion: assertEncrypted(key256)},
+		{name: "DES2-CBC", ctx: context.Background(), backend: backendDES2, algorithm: DES2CBC, assertion: assertDES2},
+		{name: "DES2-ECB", ctx: context.Background(), backend: backendDES2, algorithm: DES2ECB, assertion: func(t *testing.T, ciphertext []byte, err error) {
+			if !unsafeCryptoEnabled {
+				assertError(t, ciphertext, err)
+				return
+			}
+			if err != nil || len(ciphertext) == 0 || len(ciphertext)%des.BlockSize != 0 {
+				t.Errorf("Encrypt() = (%x, %v), want non-empty block-aligned ciphertext", ciphertext, err)
+			}
+		}},
 		{name: "Invalid KeyAlg", ctx: context.Background(), backend: backend128, algorithm: invalidAlg, assertion: assertError},
 		{name: "Wrong Key Size", ctx: context.Background(), backend: backend128, algorithm: A256GCM, assertion: assertError},
 		{name: "Canceled Context", ctx: canceledContext, backend: backend128, algorithm: A128GCM, assertion: assertError},
@@ -93,11 +121,13 @@ func Test_symmetricBackend_Decrypt(t *testing.T) {
 	key128 := bytes.Repeat([]byte{0x01}, 16)
 	key192 := bytes.Repeat([]byte{0x02}, 24)
 	key256 := bytes.Repeat([]byte{0x03}, 32)
+	keyDES2 := []byte("12345678abcdefgh")
 	wrongKey128 := bytes.Repeat([]byte{0x04}, 16)
 	// backends
 	backend128 := symmetricBackend{material: material.SymmetricMaterial{Key: key128}}
 	backend192 := symmetricBackend{material: material.SymmetricMaterial{Key: key192}}
 	backend256 := symmetricBackend{material: material.SymmetricMaterial{Key: key256}}
+	backendDES2 := symmetricBackend{material: material.SymmetricMaterial{Key: keyDES2}}
 	wrongKeyBackend := symmetricBackend{material: material.SymmetricMaterial{Key: wrongKey128}}
 	// plaintexts
 	plaintext := []byte("message to decrypt")
@@ -120,6 +150,7 @@ func Test_symmetricBackend_Decrypt(t *testing.T) {
 	ciphertext128 := encrypt(key128)
 	ciphertext192 := encrypt(key192)
 	ciphertext256 := encrypt(key256)
+	ciphertextDES2 := encryptDES2CBCForTest(t, keyDES2, plaintext)
 	tamperedCiphertext := append([]byte(nil), ciphertext128...)
 	tamperedCiphertext[len(tamperedCiphertext)-1] ^= 0xff
 	// contexts
@@ -143,6 +174,10 @@ func Test_symmetricBackend_Decrypt(t *testing.T) {
 			t.Errorf("Decrypt() plaintext = %x, want nil", decrypted)
 		}
 	}
+	assertDES2 := assertError
+	if unsafeCryptoEnabled {
+		assertDES2 = assertDecrypted
+	}
 	tests := []struct {
 		name       string
 		ctx        context.Context
@@ -154,6 +189,7 @@ func Test_symmetricBackend_Decrypt(t *testing.T) {
 		{name: "A128GCM", ctx: context.Background(), backend: backend128, algorithm: A128GCM, ciphertext: ciphertext128, assertion: assertDecrypted},
 		{name: "A192GCM", ctx: context.Background(), backend: backend192, algorithm: A192GCM, ciphertext: ciphertext192, assertion: assertDecrypted},
 		{name: "A256GCM", ctx: context.Background(), backend: backend256, algorithm: A256GCM, ciphertext: ciphertext256, assertion: assertDecrypted},
+		{name: "DES2-CBC", ctx: context.Background(), backend: backendDES2, algorithm: DES2CBC, ciphertext: ciphertextDES2, assertion: assertDES2},
 		{name: "Invalid KeyAlg", ctx: context.Background(), backend: backend128, algorithm: invalidAlg, ciphertext: ciphertext128, assertion: assertError},
 		{name: "Wrong Key Size", ctx: context.Background(), backend: backend128, algorithm: A256GCM, ciphertext: ciphertext128, assertion: assertError},
 		{name: "Short Ciphertext", ctx: context.Background(), backend: backend128, algorithm: A128GCM, ciphertext: []byte("short"), assertion: assertError},
@@ -186,6 +222,10 @@ func Test_symmetricBackend_Supports(t *testing.T) {
 			t.Errorf("Supports() = true, want false")
 		}
 	}
+	assertUnsafeSupport := assertUnsupported
+	if unsafeCryptoEnabled {
+		assertUnsafeSupport = assertSupported
+	}
 	tests := []struct {
 		name      string
 		use       key.KeyUse
@@ -205,6 +245,10 @@ func Test_symmetricBackend_Supports(t *testing.T) {
 		{name: "Decrypt A128GCM", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: A128GCM, assertion: assertSupported},
 		{name: "Decrypt A192GCM", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: A192GCM, assertion: assertSupported},
 		{name: "Decrypt A256GCM", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: A256GCM, assertion: assertSupported},
+		{name: "Encrypt DES2-ECB", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: DES2ECB, assertion: assertUnsafeSupport},
+		{name: "Encrypt DES2-CBC", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: DES2CBC, assertion: assertUnsafeSupport},
+		{name: "Decrypt DES2-ECB", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: DES2ECB, assertion: assertUnsafeSupport},
+		{name: "Decrypt DES2-CBC", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: DES2CBC, assertion: assertUnsafeSupport},
 		{name: "Invalid Algorithm", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: invalidAlg, assertion: assertUnsupported},
 		{name: "Signing Use With AES", use: key.KeyUseSigning, operation: key.KeyOpEncrypt, algorithm: A128GCM, assertion: assertUnsupported},
 		{name: "Encryption Use With HMAC", use: key.KeyUseEncryption, operation: key.KeyOpSign, algorithm: HS256, assertion: assertUnsupported},
@@ -215,4 +259,36 @@ func Test_symmetricBackend_Supports(t *testing.T) {
 			tt.assertion(t, got)
 		})
 	}
+}
+
+func des2BlockForTest(key []byte) (cipher.Block, error) {
+	key24 := append(append([]byte(nil), key...), key[:8]...)
+	return des.NewTripleDESCipher(key24)
+}
+
+func encryptDES2CBCForTest(t *testing.T, key, plaintext []byte) []byte {
+	t.Helper()
+	block, err := des2BlockForTest(key)
+	if err != nil {
+		t.Fatalf("create independent DES2 cipher: %v", err)
+	}
+	padding := block.BlockSize() - len(plaintext)%block.BlockSize()
+	padded := append(append([]byte(nil), plaintext...), bytes.Repeat([]byte{byte(padding)}, padding)...)
+	iv := bytes.Repeat([]byte{0x5a}, block.BlockSize())
+	ciphertext := append([]byte(nil), iv...)
+	ciphertext = append(ciphertext, make([]byte, len(padded))...)
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(ciphertext[len(iv):], padded)
+	return ciphertext
+}
+
+func decryptDES2ForTest(key, ciphertext []byte) ([]byte, error) {
+	block, err := des2BlockForTest(key)
+	if err != nil {
+		return nil, err
+	}
+	iv, encrypted := ciphertext[:block.BlockSize()], ciphertext[block.BlockSize():]
+	plaintext := make([]byte, len(encrypted))
+	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plaintext, encrypted)
+	padding := int(plaintext[len(plaintext)-1])
+	return plaintext[:len(plaintext)-padding], nil
 }
