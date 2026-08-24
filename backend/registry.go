@@ -2,6 +2,7 @@ package backend
 
 import (
 	"errors"
+	"reflect"
 	"sync"
 
 	"github.com/veles-security/vcrypt/key"
@@ -25,7 +26,7 @@ func Regsiter(factory Factory) {
 }
 
 func BackendFor(material material.Material) (key.Backend, error) {
-	if material == nil {
+	if material == nil || isNil(material) {
 		return nil, errors.New("nil material")
 	}
 	regsitry.RLock()
@@ -39,4 +40,14 @@ func BackendFor(material material.Material) (key.Backend, error) {
 	}
 
 	return nil, errors.New("material is not supported")
+}
+
+func isNil(value any) bool {
+	reflected := reflect.ValueOf(value)
+	switch reflected.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return reflected.IsNil()
+	default:
+		return false
+	}
 }

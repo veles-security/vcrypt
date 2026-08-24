@@ -15,16 +15,20 @@ type factory struct{}
 func (f factory) New(m material.Material) (key.Backend, error) {
 	switch value := material.Clone(m).(type) {
 	case *material.PublicMaterial:
-		if _, ok := value.Key.(*ecdsa.PublicKey); ok {
-			return &publicBackend{material: *value}, nil
+		if value != nil {
+			if publicKey, ok := value.Key.(*ecdsa.PublicKey); ok && publicKey != nil {
+				return &publicBackend{material: *value}, nil
+			}
 		}
 	case *material.PrivateMaterial:
-		if _, ok := value.Key.(*ecdsa.PrivateKey); ok {
-			return &privateBackend{material: *value}, nil
+		if value != nil {
+			if privateKey, ok := value.Key.(*ecdsa.PrivateKey); ok && privateKey != nil {
+				return &privateBackend{material: *value}, nil
+			}
 		}
 	case *material.CertificateMaterial:
-		if value.Cert != nil {
-			if publicKey, ok := value.Cert.PublicKey.(*ecdsa.PublicKey); ok {
+		if value != nil && value.Cert != nil {
+			if publicKey, ok := value.Cert.PublicKey.(*ecdsa.PublicKey); ok && publicKey != nil {
 				return &certificateBackend{
 					publicBackend: &publicBackend{material: material.PublicMaterial{Key: publicKey}},
 					material:      *value,
@@ -40,17 +44,23 @@ func (f factory) New(m material.Material) (key.Backend, error) {
 func (f factory) Supports(m material.Material) bool {
 	switch value := m.(type) {
 	case *material.PrivateMaterial:
-		_, ok := value.Key.(*ecdsa.PrivateKey)
-		return ok
-	case *material.PublicMaterial:
-		_, ok := value.Key.(*ecdsa.PublicKey)
-		return ok
-	case *material.CertificateMaterial:
-		if value.Cert == nil {
+		if value == nil {
 			return false
 		}
-		_, ok := value.Cert.PublicKey.(*ecdsa.PublicKey)
-		return ok
+		privateKey, ok := value.Key.(*ecdsa.PrivateKey)
+		return ok && privateKey != nil
+	case *material.PublicMaterial:
+		if value == nil {
+			return false
+		}
+		publicKey, ok := value.Key.(*ecdsa.PublicKey)
+		return ok && publicKey != nil
+	case *material.CertificateMaterial:
+		if value == nil || value.Cert == nil {
+			return false
+		}
+		publicKey, ok := value.Cert.PublicKey.(*ecdsa.PublicKey)
+		return ok && publicKey != nil
 	default:
 		return false
 	}

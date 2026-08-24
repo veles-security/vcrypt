@@ -12,7 +12,7 @@ type factory struct{}
 
 // New implements [backend.Factory].
 func (f factory) New(m material.Material) (key.Backend, error) {
-	if value, ok := material.Clone(m).(*material.SymmetricMaterial); ok {
+	if value, ok := material.Clone(m).(*material.SymmetricMaterial); ok && value != nil {
 		return &symmetricBackend{material: *value}, nil
 	}
 	return nil, errors.New("symetric backend: material is not supported")
@@ -20,8 +20,8 @@ func (f factory) New(m material.Material) (key.Backend, error) {
 
 // Supports implements [backend.Factory].
 func (f factory) Supports(m material.Material) bool {
-	_, ok := m.(*material.SymmetricMaterial)
-	return ok
+	value, ok := m.(*material.SymmetricMaterial)
+	return ok && value != nil
 }
 
 var _ backend.Factory = factory{}
