@@ -49,8 +49,11 @@ func Test_factory_New(t *testing.T) {
 		if !ok {
 			t.Fatalf("New() backend = %T, want *certificateBackend", backend)
 		}
-		if certificateBackend.material.Cert != certificateMaterial.Cert {
-			t.Errorf("New() did not retain the certificate")
+		if certificateBackend.material.Cert == certificateMaterial.Cert {
+			t.Errorf("New() retained the caller's mutable certificate pointer")
+		}
+		if !certificateBackend.material.Cert.PublicKey.(*ecdsa.PublicKey).Equal(publicKey) {
+			t.Errorf("New() copied a different certificate public key")
 		}
 		if _, ok := backend.(key.SignatureVerifier); !ok {
 			t.Errorf("certificate backend does not implement key.SignatureVerifier")

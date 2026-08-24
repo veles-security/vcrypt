@@ -14,7 +14,7 @@ type factory struct {
 
 // New implements [backend.Factory].
 func (f factory) New(m material.Material) (key.Backend, error) {
-	switch value := m.(type) {
+	switch value := material.Clone(m).(type) {
 	case *material.PublicMaterial:
 		if _, ok := value.Key.(*stdrsa.PublicKey); ok {
 			return &publicBackend{material: *value}, nil

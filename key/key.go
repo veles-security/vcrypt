@@ -71,7 +71,7 @@ func New(candidate KeyCandidate, backend Backend) Key {
 		priority:     candidate.Priority,
 		notBefore:    candidate.NotBefore,
 		notAfter:     candidate.NotAfter,
-		material:     candidate.Material,
+		material:     material.Clone(candidate.Material),
 		backend:      backend,
 	}
 }
@@ -83,7 +83,7 @@ func (key Key) Status() KeyStatus           { return key.status }
 func (key Key) Priority() int               { return key.priority }
 func (key Key) NotBefore() time.Time        { return key.notBefore }
 func (key Key) NotAfter() time.Time         { return key.notAfter }
-func (key Key) Material() material.Material { return key.material }
+func (key Key) Material() material.Material { return material.Clone(key.material) }
 func (key Key) Backend() Backend            { return key.backend }
 func (key Key) Restrictions() []Capability {
 	return append([]Capability(nil), key.restrictions...)

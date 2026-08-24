@@ -35,7 +35,7 @@ func (b *publicBackend) signatureOptions(alg key.KeyAlg) (crypto.Hash, bool, err
 
 // Capabilities implements [key.Backend].
 func (p *publicBackend) Capabilities() []key.Capability {
-	return capabilities[PUBLIC_MATERIAL]
+	return append([]key.Capability(nil), capabilities[PUBLIC_MATERIAL]...)
 }
 
 // Supports implements [key.Backend].

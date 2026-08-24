@@ -15,7 +15,7 @@ type publicBackend struct {
 
 // Capabilities implements [key.Backend].
 func (b *publicBackend) Capabilities() []key.Capability {
-	return capabilities[PUBLIC_MATERIAL]
+	return append([]key.Capability(nil), capabilities[PUBLIC_MATERIAL]...)
 }
 
 // Supports implements [key.Backend].

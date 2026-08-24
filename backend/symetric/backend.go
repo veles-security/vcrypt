@@ -66,7 +66,7 @@ func (b *symmetricBackend) encryptionOptions(algorithm key.KeyAlg) (cipher.AEAD,
 
 // Capabilities implements [key.Backend].
 func (b *symmetricBackend) Capabilities() []key.Capability {
-	return capabilities
+	return append([]key.Capability(nil), capabilities...)
 }
 
 // Sign implements [key.Signer].

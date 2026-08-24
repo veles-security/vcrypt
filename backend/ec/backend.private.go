@@ -17,7 +17,7 @@ type privateBackend struct {
 
 // Capabilities implements [key.Backend].
 func (b *privateBackend) Capabilities() []key.Capability {
-	return capabilities[PRIVATE_MATERIAL]
+	return append([]key.Capability(nil), capabilities[PRIVATE_MATERIAL]...)
 }
 
 // Sign implements [key.Signer].
