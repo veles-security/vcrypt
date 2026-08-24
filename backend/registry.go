@@ -9,7 +9,7 @@ import (
 	"github.com/veles-security/vcrypt/material"
 )
 
-var regsitry = struct {
+var registry = struct {
 	sync.RWMutex
 	factories []Factory
 }{
@@ -20,20 +20,20 @@ func Regsiter(factory Factory) {
 	if factory == nil {
 		return
 	}
-	regsitry.Lock()
-	regsitry.factories = append(regsitry.factories, factory)
-	regsitry.Unlock()
+	registry.Lock()
+	registry.factories = append(registry.factories, factory)
+	registry.Unlock()
 }
 
 func BackendFor(material material.Material) (key.Backend, error) {
 	if material == nil || isNil(material) {
 		return nil, errors.New("nil material")
 	}
-	regsitry.RLock()
-	defer regsitry.RUnlock()
+	registry.RLock()
+	defer registry.RUnlock()
 
-	for i := len(regsitry.factories) - 1; i >= 0; i-- {
-		backendFactory := regsitry.factories[i]
+	for i := len(registry.factories) - 1; i >= 0; i-- {
+		backendFactory := registry.factories[i]
 		if backendFactory.Supports(material) {
 			return backendFactory.New(material)
 		}
