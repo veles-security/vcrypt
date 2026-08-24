@@ -17,12 +17,29 @@ import (
 
 type Store interface {
 	Repository
+	Close() error
 	Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error)
 	VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error
 	Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error)
 	Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error)
 	Bind(source keysource.Source) error
 	RefreshAll() error
+}
+
+// Close stops all sources owned by the store and releases their resources.
+func (m *store) Close() error {
+	m.sourcesMU.RLock()
+	sources := make([]keysource.Source, 0, len(m.sources))
+	for _, source := range m.sources {
+		sources = append(sources, source)
+	}
+	m.sourcesMU.RUnlock()
+
+	var result error
+	for _, source := range sources {
+		result = errors.Join(result, source.Close())
+	}
+	return result
 }
 
 type store struct {
