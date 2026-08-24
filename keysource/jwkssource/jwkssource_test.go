@@ -70,15 +70,27 @@ func Test_Source_Load(t *testing.T) {
 		name      string
 		status    int
 		body      string
+		redirect  string
 		assertion func(*testing.T, []key.KeyCandidate, error)
 	}{
 		{name: "JWKS", status: http.StatusOK, body: jwks("key-1"), assertion: assertKeys},
+		{name: "HTTPS Redirect", status: http.StatusOK, body: jwks("key-1"), redirect: "https://keys.example/jwks", assertion: assertKeys},
+		{name: "HTTP Redirect Rejected", status: http.StatusOK, body: jwks("key-1"), redirect: "http://keys.example/jwks", assertion: assertErrorContaining("insecure URL")},
 		{name: "HTTP Error", status: http.StatusServiceUnavailable, body: "unavailable", assertion: assertErrorContaining("503")},
 		{name: "Malformed JWKS", status: http.StatusOK, body: `{"keys":[`, assertion: assertErrorContaining("decode JWKS")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				if tt.redirect != "" && request.URL.String() == "https://issuer.example/jwks" {
+					return &http.Response{
+						StatusCode: http.StatusFound,
+						Status:     "302 Found",
+						Body:       io.NopCloser(strings.NewReader("")),
+						Header:     http.Header{"Location": []string{tt.redirect}},
+						Request:    request,
+					}, nil
+				}
 				return &http.Response{
 					StatusCode: tt.status,
 					Status:     fmt.Sprintf("%d %s", tt.status, http.StatusText(tt.status)),
@@ -97,6 +109,56 @@ func Test_Source_Load(t *testing.T) {
 		})
 	}
 	t.Run("Cancellation", testSourceLoadCancellation)
+}
+
+func Test_Source_checkRedirect(t *testing.T) {
+	customErr := errors.New("custom redirect policy")
+	assertAllowed := func(t *testing.T, err error) {
+		if err != nil {
+			t.Errorf("checkRedirect() error = %v, want nil", err)
+		}
+	}
+	assertInsecureRedirect := func(t *testing.T, err error) {
+		if err == nil || !strings.Contains(err.Error(), "insecure URL") {
+			t.Errorf("checkRedirect() error = %v, want insecure URL error", err)
+		}
+	}
+	assertCustomPolicy := func(t *testing.T, err error) {
+		if !errors.Is(err, customErr) {
+			t.Errorf("checkRedirect() error = %v, want %v", err, customErr)
+		}
+	}
+	assertRedirectLimit := func(t *testing.T, err error) {
+		if err == nil || !strings.Contains(err.Error(), "10 redirects") {
+			t.Errorf("checkRedirect() error = %v, want redirect limit error", err)
+		}
+	}
+	customClient := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return customErr
+	}}
+	tests := []struct {
+		name      string
+		source    *Source
+		url       string
+		via       int
+		assertion func(*testing.T, error)
+	}{
+		{name: "HTTPS", source: &Source{client: &http.Client{}}, url: "https://issuer.example/jwks", assertion: assertAllowed},
+		{name: "HTTP Rejected", source: &Source{client: &http.Client{}}, url: "http://issuer.example/jwks", assertion: assertInsecureRedirect},
+		{name: "HTTP Explicitly Allowed", source: &Source{client: &http.Client{}, allowHTTP: true}, url: "http://issuer.example/jwks", assertion: assertAllowed},
+		{name: "Caller Policy Preserved", source: &Source{client: customClient}, url: "https://issuer.example/jwks", assertion: assertCustomPolicy},
+		{name: "Default Redirect Limit", source: &Source{client: &http.Client{}}, url: "https://issuer.example/jwks", via: 10, assertion: assertRedirectLimit},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request, err := http.NewRequest(http.MethodGet, tt.url, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotErr := tt.source.checkRedirect(request, make([]*http.Request, tt.via))
+			tt.assertion(t, gotErr)
+		})
+	}
 }
 
 func testSourceLoadCancellation(t *testing.T) {

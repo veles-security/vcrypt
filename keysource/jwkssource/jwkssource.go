@@ -157,7 +157,9 @@ func (s *Source) load(ctx context.Context) ([]key.KeyCandidate, string, error) {
 		return nil, "", fmt.Errorf("create JWKS request: %w", err)
 	}
 	request.Header.Set("Accept", "application/jwk-set+json, application/json")
-	response, err := s.client.Do(request)
+	client := *s.client
+	client.CheckRedirect = s.checkRedirect
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, "", fmt.Errorf("request JWKS %q: %w", s.url, err)
 	}
@@ -188,6 +190,19 @@ func (s *Source) load(ctx context.Context) ([]key.KeyCandidate, string, error) {
 	}
 	digest := sha256.Sum256(encoded)
 	return artifact.Keys, hex.EncodeToString(digest[:]), nil
+}
+
+func (s *Source) checkRedirect(request *http.Request, via []*http.Request) error {
+	if request.URL.Scheme != "https" && !s.allowHTTP {
+		return fmt.Errorf("JWKS source redirect to insecure URL %q is not permitted", request.URL.String())
+	}
+	if s.client.CheckRedirect != nil {
+		return s.client.CheckRedirect(request, via)
+	}
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	return nil
 }
 
 var _ keysource.SelfRefreshingSource = (*Source)(nil)
