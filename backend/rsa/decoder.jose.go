@@ -65,7 +65,7 @@ func (d *joseDecoder) Decode(ctx context.Context, encoded []byte, options ...key
 		if !ok || certificateKey.E != publicKey.E || certificateKey.N.Cmp(publicKey.N) != 0 {
 			return key.KeyCandidate{}, fmt.Errorf("RSA JOSE decoder: x5c certificate does not match JWK public key")
 		}
-		sha1Sum := sha1.Sum(certificate.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE x5t descriptor
+		sha1Sum := sha1.Sum(certificate.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE x5t descriptor; nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
 		if jwk.SHA1Thumbprint != "" && jwk.SHA1Thumbprint != base64.RawURLEncoding.EncodeToString(sha1Sum[:]) {
 			return key.KeyCandidate{}, fmt.Errorf("RSA JOSE decoder: x5t does not match x5c certificate")
 		}

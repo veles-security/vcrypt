@@ -10,72 +10,13 @@
   <multilang>      47      61          Community    1074                                                                
   go               84      54                                                                                           
                                                                                                                         
-                   
-                   
-┌─────────────────┐
-│ 6 Code Findings │
-└─────────────────┘
-                              
-    backend/ec/decoder.jose.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
-          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
-          therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.                 
-          Details: https://sg.run/XBYA                                                                     
-                                                                                                           
-           64┆ sha1Sum := sha1.Sum(certificate.Raw) // #nosec G401 -- SHA-1 is required for the legacy
-               JOSE x5t descriptor                                                                    
-                              
-    backend/ec/encoder.jose.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
-          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
-          therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.                 
-          Details: https://sg.run/XBYA                                                                     
-                                                                                                           
-          115┆ sha1Sum := sha1.Sum(value.Cert.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE
-               x5t descriptor                                                                             
-                               
-    backend/rsa/decoder.jose.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
-          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
-          therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.                 
-          Details: https://sg.run/XBYA                                                                     
-                                                                                                           
-           68┆ sha1Sum := sha1.Sum(certificate.Raw) // #nosec G401 -- SHA-1 is required for the legacy
-               JOSE x5t descriptor                                                                    
-                               
-    backend/rsa/encoder.jose.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
-          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
-          therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.                 
-          Details: https://sg.run/XBYA                                                                     
-                                                                                                           
-          122┆ sha1Sum := sha1.Sum(value.Cert.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE
-               x5t descriptor                                                                             
-                                        
-    backend/rsa/unsafe_crypto_enabled.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
-          Detected SHA1 hash algorithm which is considered insecure. SHA1 is not collision resistant and is
-          therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.                 
-          Details: https://sg.run/XBYA                                                                     
-                                                                                                           
-           30┆ return sha1.New(), nil
-                                             
-    backend/symetric/unsafe_crypto_enabled.go
-    ❯❱ go.lang.security.audit.crypto.use_of_weak_crypto.use-of-DES
-          Detected DES cipher algorithm which is insecure. The algorithm is considered weak and has been
-          deprecated. Use AES instead.                                                                  
-          Details: https://sg.run/jREA                                                                  
-                                                                                                        
-           34┆ return des.NewTripleDESCipher(key24) // #nosec G502 -- legacy support is explicitly build-
-               tagged                                                                                    
-
                 
                 
 ┌──────────────┐
 │ Scan Summary │
 └──────────────┘
 ✅ Scan completed successfully.
- • Findings: 6 (6 blocking)
+ • Findings: 0 (0 blocking)
  • Rules run: 131
  • Targets scanned: 61
  • Parsed lines: ~99.9%
@@ -84,6 +25,10 @@
    ◦ Files matching .semgrepignore patterns: 18
  • Scan was limited to files tracked by git
  • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
-Ran 131 rules on 61 files: 6 findings.
+Ran 131 rules on 61 files: 0 findings.
+(need more rules? `semgrep login` for additional free Semgrep Registry rules)
+
 
 A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+If Semgrep missed a finding, please send us feedback to let us know!
+See https://semgrep.dev/docs/reporting-false-negatives/

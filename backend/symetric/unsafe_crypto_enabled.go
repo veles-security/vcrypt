@@ -31,7 +31,7 @@ func des2Cipher(keyBytes []byte, algorithm key.KeyAlg) (cipher.Block, error) {
 	key24 := make([]byte, 24)
 	copy(key24, keyBytes)
 	copy(key24[16:], keyBytes[:8])
-	return des.NewTripleDESCipher(key24) // #nosec G502 -- legacy support is explicitly build-tagged
+	return des.NewTripleDESCipher(key24) // #nosec G502 -- legacy support is explicitly build-tagged; nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-DES
 }
 
 func unsafeEncrypt(keyBytes []byte, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {

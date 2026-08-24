@@ -27,7 +27,7 @@ var unsafeCryptoCapabilities = map[MaterialType][]key.Capability{
 }
 
 func unsafeEncryptionHash() (hash.Hash, error) {
-	return sha1.New(), nil
+	return sha1.New(), nil // nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
 }
 
 func unsafeEncryptPKCS1v15(publicKey *stdrsa.PublicKey, plaintext []byte) ([]byte, error) {
