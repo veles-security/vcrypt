@@ -10,7 +10,11 @@ const (
 	PS384 key.KeyAlg = "PS384"
 	PS512 key.KeyAlg = "PS512"
 
-	RSA1_5     key.KeyAlg = "RSA1_5"
+	// RSA1_5 uses legacy PKCS #1 v1.5 encryption padding and is available only
+	// in builds made with the with_unsafe_crypto build tag.
+	RSA1_5 key.KeyAlg = "RSA1_5"
+	// RSAOAEP uses SHA-1 and is available only in builds made with the
+	// with_unsafe_crypto build tag.
 	RSAOAEP    key.KeyAlg = "RSA-OAEP"
 	RSAOAEP256 key.KeyAlg = "RSA-OAEP-256"
 	RSAOAEP384 key.KeyAlg = "RSA-OAEP-384"
@@ -32,8 +36,6 @@ var capabilities = map[MaterialType][]key.Capability{
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS256},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS384},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS512},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSA1_5},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP256},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP384},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP512},
@@ -51,15 +53,17 @@ var capabilities = map[MaterialType][]key.Capability{
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS256},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS384},
 		{Use: key.KeyUseSigning, Operation: key.KeyOpVerify, Algorithm: PS512},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSA1_5},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP256},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP384},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpEncrypt, Algorithm: RSAOAEP512},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSA1_5},
-		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP256},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP384},
 		{Use: key.KeyUseEncryption, Operation: key.KeyOpDecrypt, Algorithm: RSAOAEP512},
 	},
+}
+
+func init() {
+	for materialType, materialCapabilities := range unsafeCryptoCapabilities {
+		capabilities[materialType] = append(capabilities[materialType], materialCapabilities...)
+	}
 }

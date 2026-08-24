@@ -3,7 +3,6 @@ package rsa
 import (
 	"crypto/rand"
 	stdrsa "crypto/rsa"
-	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
@@ -15,7 +14,7 @@ import (
 func encryptionHash(algorithm key.KeyAlg) (hash.Hash, error) {
 	switch algorithm {
 	case RSAOAEP:
-		return sha1.New(), nil
+		return unsafeEncryptionHash()
 	case RSAOAEP256:
 		return sha256.New(), nil
 	case RSAOAEP384:
@@ -29,7 +28,7 @@ func encryptionHash(algorithm key.KeyAlg) (hash.Hash, error) {
 
 func encrypt(publicKey *stdrsa.PublicKey, algorithm key.KeyAlg, plaintext []byte) ([]byte, error) {
 	if algorithm == RSA1_5 {
-		return stdrsa.EncryptPKCS1v15(rand.Reader, publicKey, plaintext)
+		return unsafeEncryptPKCS1v15(publicKey, plaintext)
 	}
 	hash, err := encryptionHash(algorithm)
 	if err != nil {
@@ -40,7 +39,7 @@ func encrypt(publicKey *stdrsa.PublicKey, algorithm key.KeyAlg, plaintext []byte
 
 func decrypt(privateKey *stdrsa.PrivateKey, algorithm key.KeyAlg, ciphertext []byte) ([]byte, error) {
 	if algorithm == RSA1_5 {
-		return stdrsa.DecryptPKCS1v15(rand.Reader, privateKey, ciphertext)
+		return unsafeDecryptPKCS1v15(privateKey, ciphertext)
 	}
 	hash, err := encryptionHash(algorithm)
 	if err != nil {

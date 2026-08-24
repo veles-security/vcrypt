@@ -202,6 +202,12 @@ func Test_privateBackend_Encrypt(t *testing.T) {
 			t.Errorf("want err, got nil")
 		}
 	}
+	assertRSAOAEP := assertError
+	assertRSA1_5 := assertError
+	if unsafeCryptoEnabled {
+		assertRSAOAEP = assertEncrypted(RSAOAEP)
+		assertRSA1_5 = assertEncrypted(RSA1_5)
+	}
 	tests := []struct {
 		name      string
 		backend   privateBackend
@@ -209,8 +215,8 @@ func Test_privateBackend_Encrypt(t *testing.T) {
 		plaintext []byte
 		assertion func(*testing.T, []byte, error)
 	}{
-		{name: "RSA1_5", backend: backend, algorithm: RSA1_5, plaintext: plaintext, assertion: assertEncrypted(RSA1_5)},
-		{name: "RSA-OAEP", backend: backend, algorithm: RSAOAEP, plaintext: plaintext, assertion: assertEncrypted(RSAOAEP)},
+		{name: "RSA1_5", backend: backend, algorithm: RSA1_5, plaintext: plaintext, assertion: assertRSA1_5},
+		{name: "RSA-OAEP", backend: backend, algorithm: RSAOAEP, plaintext: plaintext, assertion: assertRSAOAEP},
 		{name: "RSA-OAEP-256", backend: backend, algorithm: RSAOAEP256, plaintext: plaintext, assertion: assertEncrypted(RSAOAEP256)},
 		{name: "RSA-OAEP-384", backend: backend, algorithm: RSAOAEP384, plaintext: plaintext, assertion: assertEncrypted(RSAOAEP384)},
 		{name: "RSA-OAEP-512", backend: backend, algorithm: RSAOAEP512, plaintext: plaintext, assertion: assertEncrypted(RSAOAEP512)},
@@ -282,6 +288,12 @@ func Test_privateBackend_Decrypt(t *testing.T) {
 			t.Errorf("want err, got nil")
 		}
 	}
+	assertRSAOAEP := assertError
+	assertRSA1_5 := assertError
+	if unsafeCryptoEnabled {
+		assertRSAOAEP = assertDecrypted
+		assertRSA1_5 = assertDecrypted
+	}
 	tests := []struct {
 		name       string
 		backend    privateBackend
@@ -289,8 +301,8 @@ func Test_privateBackend_Decrypt(t *testing.T) {
 		ciphertext []byte
 		assertion  func(*testing.T, []byte, error)
 	}{
-		{name: "RSA1_5", backend: backend, algorithm: RSA1_5, ciphertext: rsa1_5Ciphertext, assertion: assertDecrypted},
-		{name: "RSA-OAEP", backend: backend, algorithm: RSAOAEP, ciphertext: rsaOAEPCiphertext, assertion: assertDecrypted},
+		{name: "RSA1_5", backend: backend, algorithm: RSA1_5, ciphertext: rsa1_5Ciphertext, assertion: assertRSA1_5},
+		{name: "RSA-OAEP", backend: backend, algorithm: RSAOAEP, ciphertext: rsaOAEPCiphertext, assertion: assertRSAOAEP},
 		{name: "RSA-OAEP-256", backend: backend, algorithm: RSAOAEP256, ciphertext: rsaOAEP256Ciphertext, assertion: assertDecrypted},
 		{name: "RSA-OAEP-384", backend: backend, algorithm: RSAOAEP384, ciphertext: rsaOAEP384Ciphertext, assertion: assertDecrypted},
 		{name: "RSA-OAEP-512", backend: backend, algorithm: RSAOAEP512, ciphertext: rsaOAEP512Ciphertext, assertion: assertDecrypted},
@@ -330,6 +342,12 @@ func Test_privateBackend_Supports(t *testing.T) {
 			t.Errorf("Supports() = true, want false")
 		}
 	}
+	assertRSAOAEPSupport := assertUnsupported
+	assertRSA1_5Support := assertUnsupported
+	if unsafeCryptoEnabled {
+		assertRSAOAEPSupport = assertSupported
+		assertRSA1_5Support = assertSupported
+	}
 	tests := []struct {
 		name      string
 		use       key.KeyUse
@@ -349,13 +367,13 @@ func Test_privateBackend_Supports(t *testing.T) {
 		{name: "Verify PS256", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS256, assertion: assertSupported},
 		{name: "Verify PS384", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS384, assertion: assertSupported},
 		{name: "Verify PS512", use: key.KeyUseSigning, operation: key.KeyOpVerify, algorithm: PS512, assertion: assertSupported},
-		{name: "Encrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSA1_5, assertion: assertSupported},
-		{name: "Encrypt RSA-OAEP", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP, assertion: assertSupported},
+		{name: "Encrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSA1_5, assertion: assertRSA1_5Support},
+		{name: "Encrypt RSA-OAEP", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP, assertion: assertRSAOAEPSupport},
 		{name: "Encrypt RSA-OAEP-256", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP256, assertion: assertSupported},
 		{name: "Encrypt RSA-OAEP-384", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP384, assertion: assertSupported},
 		{name: "Encrypt RSA-OAEP-512", use: key.KeyUseEncryption, operation: key.KeyOpEncrypt, algorithm: RSAOAEP512, assertion: assertSupported},
-		{name: "Decrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSA1_5, assertion: assertSupported},
-		{name: "Decrypt RSA-OAEP", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSAOAEP, assertion: assertSupported},
+		{name: "Decrypt RSA1_5", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSA1_5, assertion: assertRSA1_5Support},
+		{name: "Decrypt RSA-OAEP", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSAOAEP, assertion: assertRSAOAEPSupport},
 		{name: "Decrypt RSA-OAEP-256", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSAOAEP256, assertion: assertSupported},
 		{name: "Decrypt RSA-OAEP-384", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSAOAEP384, assertion: assertSupported},
 		{name: "Decrypt RSA-OAEP-512", use: key.KeyUseEncryption, operation: key.KeyOpDecrypt, algorithm: RSAOAEP512, assertion: assertSupported},
