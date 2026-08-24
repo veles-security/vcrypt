@@ -7,12 +7,12 @@ REPORT_DIR := test/reports/sast
 
 sast-gosec:
 	@mkdir -p $(REPORT_DIR)
-	@docker run --rm -it -v "$(PWD)":/workspace -w /workspace securego/gosec:2.24.6 -out $(REPORT_DIR)/gosec.txt ./...
+	@docker run --rm -it -v "$(PWD)":/workspace -w /workspace securego/gosec:2.24.7 -out $(REPORT_DIR)/gosec.txt ./...
 	@echo "SAST gosec completed"
 
 sast-govulncheck:
 	@mkdir -p $(REPORT_DIR)
-	@docker run --rm -v "$(PWD)":/app -w /app golang:1.26 go mod download && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./... >$(REPORT_DIR)/govulncheck.txt
+	@docker run --rm -v "$(PWD)":/app -w /app golang:1.26.7 go mod download && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./... >$(REPORT_DIR)/govulncheck.txt
 	@echo "SAST govulncheck completed"
 
 sast-semgrep:

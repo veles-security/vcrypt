@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- SHA-1 is required for the legacy JOSE x5t descriptor
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -61,7 +61,7 @@ func (d *joseDecoder) Decode(ctx context.Context, encoded []byte, options ...key
 		if !ok || !equalPublicKeys(certificateKey, publicKey) {
 			return key.KeyCandidate{}, fmt.Errorf("EC JOSE decoder: x5c certificate does not match JWK public key")
 		}
-		sha1Sum := sha1.Sum(certificate.Raw)
+		sha1Sum := sha1.Sum(certificate.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE x5t descriptor
 		if jwk.SHA1Thumbprint != "" && jwk.SHA1Thumbprint != base64.RawURLEncoding.EncodeToString(sha1Sum[:]) {
 			return key.KeyCandidate{}, fmt.Errorf("EC JOSE decoder: x5t does not match x5c certificate")
 		}

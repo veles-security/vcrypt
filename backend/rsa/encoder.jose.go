@@ -3,7 +3,7 @@ package rsa
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- SHA-1 is required for the legacy JOSE x5t descriptor
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -119,7 +119,7 @@ func (e *joseEncoder) Encode(ctx context.Context, value key.Key, options ...key.
 		}
 		setPublicJWK(&jwk, publicKey)
 		jwk.Certificates = []string{base64.StdEncoding.EncodeToString(value.Cert.Raw)}
-		sha1Sum := sha1.Sum(value.Cert.Raw)
+		sha1Sum := sha1.Sum(value.Cert.Raw) // #nosec G401 -- SHA-1 is required for the legacy JOSE x5t descriptor
 		sha256Sum := sha256.Sum256(value.Cert.Raw)
 		jwk.SHA1Thumbprint = base64.RawURLEncoding.EncodeToString(sha1Sum[:])
 		jwk.SHA256Thumbprint = base64.RawURLEncoding.EncodeToString(sha256Sum[:])
