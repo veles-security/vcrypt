@@ -75,8 +75,6 @@ func (m *store) Bind(source keysource.Source) error {
 	m.loading[id] = struct{}{}
 	m.sourcesMU.Unlock()
 
-	m.bindSelfRefreshing(source)
-
 	candidates, err := source.Load(context.Background())
 	var keys []key.Key
 	if err != nil {
@@ -102,6 +100,9 @@ func (m *store) Bind(source keysource.Source) error {
 	if err != nil {
 		return err
 	}
+	// Activate refresh only after the initial keys and source registration have
+	// both been committed successfully.
+	m.bindSelfRefreshing(source)
 	return nil
 }
 

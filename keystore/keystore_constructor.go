@@ -24,14 +24,16 @@ func New(sources ...keysource.Source) (Store, error) {
 		if _, ok := m.sources[id]; ok {
 			return nil, fmt.Errorf("source %s already bound", id)
 		}
-		m.bindSelfRefreshing(source)
 		m.sources[id] = source
 	}
-	// Self-refreshing sources still receive one initial load. Later updates are
-	// delivered through the callback installed above.
+	// Load every source before activating automatic refresh. If construction
+	// fails, no source retains a callback to the store being discarded.
 	err := m.loadSources(sources)
 	if err != nil {
 		return nil, err
+	}
+	for _, source := range sources {
+		m.bindSelfRefreshing(source)
 	}
 	return m, nil
 }
