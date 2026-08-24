@@ -26,6 +26,7 @@ type Source struct {
 	frequency time.Duration
 	client    *http.Client
 	decoder   vapi.Decoder[descriptor.JWKS[key.KeyCandidate], key.JOSEDecodeOption]
+	allowHTTP bool
 
 	loadMu sync.Mutex
 	mu     sync.Mutex

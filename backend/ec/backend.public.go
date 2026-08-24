@@ -45,7 +45,7 @@ func (b *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAl
 	if err != nil {
 		return err
 	}
-	if !ecdsa.VerifyASN1(publicKey, digest, signature) {
+	if !verifySignature(publicKey, digest, signature) {
 		return fmt.Errorf("EC backend: invalid signature")
 	}
 	return nil

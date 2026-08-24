@@ -38,6 +38,31 @@ func Test_WithHTTPClient(t *testing.T) {
 	}
 }
 
+func Test_WithInsecureHTTP(t *testing.T) {
+	assertAllowed := func(t *testing.T, source *Source, err error) {
+		if err != nil {
+			t.Fatalf("option error = %v", err)
+		}
+		if !source.allowHTTP {
+			t.Error("allowHTTP = false, want true")
+		}
+	}
+	tests := []struct {
+		name      string
+		option    Option
+		assertion func(*testing.T, *Source, error)
+	}{
+		{name: "Allowed", option: WithInsecureHTTP(), assertion: assertAllowed},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := &Source{}
+			err := tt.option(source)
+			tt.assertion(t, source, err)
+		})
+	}
+}
+
 func Test_New(t *testing.T) {
 	client := &http.Client{Timeout: time.Second}
 	assertSource := func(t *testing.T, source *Source, err error) {
@@ -56,6 +81,14 @@ func Test_New(t *testing.T) {
 			t.Errorf("New() = (%v, %v), want (nil, error)", source, err)
 		}
 	}
+	assertHTTPSource := func(t *testing.T, source *Source, err error) {
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if source.url != "http://issuer.example/jwks" || !source.allowHTTP {
+			t.Errorf("New() source = %#v, want explicitly allowed HTTP source", source)
+		}
+	}
 	tests := []struct {
 		name      string
 		id        string
@@ -65,6 +98,8 @@ func Test_New(t *testing.T) {
 		assertion func(*testing.T, *Source, error)
 	}{
 		{name: "Source", id: "issuer", url: "https://issuer.example/jwks", frequency: time.Minute, options: []Option{nil, WithHTTPClient(client)}, assertion: assertSource},
+		{name: "Explicitly Allowed HTTP", id: "issuer", url: "http://issuer.example/jwks", frequency: time.Minute, options: []Option{WithInsecureHTTP()}, assertion: assertHTTPSource},
+		{name: "HTTP Rejected By Default", id: "issuer", url: "http://issuer.example/jwks", frequency: time.Minute, assertion: assertError},
 		{name: "Empty ID", url: "https://issuer.example/jwks", frequency: time.Minute, assertion: assertError},
 		{name: "Empty URL", id: "issuer", frequency: time.Minute, assertion: assertError},
 		{name: "Relative URL", id: "issuer", url: "/jwks", frequency: time.Minute, assertion: assertError},

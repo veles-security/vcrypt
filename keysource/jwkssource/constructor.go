@@ -15,6 +15,16 @@ import (
 // Option configures a JWKS source.
 type Option func(*Source) error
 
+// WithInsecureHTTP permits loading a JWKS over unauthenticated HTTP. HTTPS is
+// required by default because an attacker who can modify a JWKS response can
+// replace the keys trusted by its consumers.
+func WithInsecureHTTP() Option {
+	return func(source *Source) error {
+		source.allowHTTP = true
+		return nil
+	}
+}
+
 // WithHTTPClient configures the client used to request the JWKS endpoint. The
 // caller retains ownership of the client and its transport.
 func WithHTTPClient(client *http.Client) Option {
@@ -53,6 +63,9 @@ func New(id, rawURL string, frequency time.Duration, options ...Option) (*Source
 				return nil, err
 			}
 		}
+	}
+	if parsedURL.Scheme == "http" && !source.allowHTTP {
+		return nil, fmt.Errorf("JWKS source URL %q uses insecure HTTP; use WithInsecureHTTP to permit it", rawURL)
 	}
 	return source, nil
 }

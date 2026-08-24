@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/material"
@@ -36,7 +37,11 @@ func (b *privateBackend) Sign(ctx context.Context, algorithm key.KeyAlg, message
 	if err != nil {
 		return nil, err
 	}
-	return ecdsa.SignASN1(rand.Reader, privateKey, digest)
+	r, s, err := ecdsa.Sign(rand.Reader, privateKey, digest)
+	if err != nil {
+		return nil, fmt.Errorf("EC backend: sign digest: %w", err)
+	}
+	return encodeSignature(&privateKey.PublicKey, r, s)
 }
 
 // Supports implements [key.Backend].
@@ -66,10 +71,36 @@ func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyA
 	if err != nil {
 		return err
 	}
-	if !ecdsa.VerifyASN1(&privateKey.PublicKey, digest, signature) {
+	if !verifySignature(&privateKey.PublicKey, digest, signature) {
 		return fmt.Errorf("EC backend: invalid signature")
 	}
 	return nil
+}
+
+// encodeSignature encodes an ECDSA signature using the fixed-width R || S
+// representation required by JOSE (RFC 7518, section 3.4).
+func encodeSignature(publicKey *ecdsa.PublicKey, r, s *big.Int) ([]byte, error) {
+	if publicKey == nil || publicKey.Curve == nil || publicKey.Curve.Params() == nil || r == nil || s == nil {
+		return nil, fmt.Errorf("EC backend: invalid signature values")
+	}
+	size := (publicKey.Curve.Params().N.BitLen() + 7) / 8
+	signature := make([]byte, 2*size)
+	r.FillBytes(signature[:size])
+	s.FillBytes(signature[size:])
+	return signature, nil
+}
+
+func verifySignature(publicKey *ecdsa.PublicKey, digest, signature []byte) bool {
+	if publicKey == nil || publicKey.Curve == nil || publicKey.Curve.Params() == nil {
+		return false
+	}
+	size := (publicKey.Curve.Params().N.BitLen() + 7) / 8
+	if len(signature) != 2*size {
+		return false
+	}
+	r := new(big.Int).SetBytes(signature[:size])
+	s := new(big.Int).SetBytes(signature[size:])
+	return ecdsa.Verify(publicKey, digest, r, s)
 }
 
 var _ key.Backend = &privateBackend{}
