@@ -1,11 +1,45 @@
 package randomsource
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/veles-security/vcrypt/key"
 )
+
+func Test_Source_Close(t *testing.T) {
+	source, err := New("rotating", HMAC256, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertClosed := func(t *testing.T, err error) {
+		if err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+		if _, err := source.Load(context.Background()); !errors.Is(err, ErrClosed) {
+			t.Errorf("Load() after Close error = %v, want ErrClosed", err)
+		}
+	}
+	assertIdempotent := func(t *testing.T, err error) {
+		if err != nil {
+			t.Errorf("second Close() error = %v", err)
+		}
+	}
+	tests := []struct {
+		name      string
+		assertion func(*testing.T, error)
+	}{
+		{name: "Closed", assertion: assertClosed},
+		{name: "Idempotent", assertion: assertIdempotent},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.assertion(t, source.Close())
+		})
+	}
+}
 
 func TestLoadPublishesThreeEpochsAndRetainsKeys(t *testing.T) {
 	source, err := New("rotating", ECDSAP256, time.Hour)
@@ -15,7 +49,7 @@ func TestLoadPublishesThreeEpochsAndRetainsKeys(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	source.now = func() time.Time { return now }
 
-	keys, err := source.Load()
+	keys, err := source.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +71,7 @@ func TestLoadPublishesThreeEpochsAndRetainsKeys(t *testing.T) {
 
 	oldCurrent := keys[1]
 	now = now.Add(time.Hour)
-	keys, err = source.Load()
+	keys, err = source.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

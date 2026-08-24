@@ -2,6 +2,7 @@ package filesource
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
@@ -23,31 +24,67 @@ import (
 
 const defaultFilePollInterval = time.Second
 
+var ErrClosed = errors.New("file source is closed")
+
 type fileSource struct {
 	id           string
 	path         string
 	monitor      bool
 	pollInterval time.Duration
 	candidate    key.KeyCandidate
+	ctx          context.Context
+	cancel       context.CancelFunc
 
 	mu       sync.Mutex
 	callback func([]key.KeyCandidate) error
 	started  bool
+	closed   bool
 	snapshot string
 }
 
 func (f *fileSource) ID() string { return f.id }
 
-func (f *fileSource) Load() ([]key.KeyCandidate, error) {
-	keys, snapshot, err := f.load()
+func (f *fileSource) Load(ctx context.Context) ([]key.KeyCandidate, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("load file source: nil context")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	if f.closed {
+		f.mu.Unlock()
+		return nil, ErrClosed
+	}
+	f.mu.Unlock()
+	keys, snapshot, err := f.load(ctx)
 	if err != nil {
 		return nil, err
 	}
 	f.mu.Lock()
+	if f.closed {
+		f.mu.Unlock()
+		return nil, ErrClosed
+	}
 	f.snapshot = snapshot
 	f.startMonitorLocked()
 	f.mu.Unlock()
 	return keys, nil
+}
+
+func (f *fileSource) Close() error {
+	f.mu.Lock()
+	if f.closed {
+		f.mu.Unlock()
+		return nil
+	}
+	f.closed = true
+	cancel := f.cancel
+	f.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	return nil
 }
 
 func (f *fileSource) SetRefreshCallback(callback func([]key.KeyCandidate) error) {
@@ -58,7 +95,7 @@ func (f *fileSource) SetRefreshCallback(callback func([]key.KeyCandidate) error)
 }
 
 func (f *fileSource) startMonitorLocked() {
-	if !f.monitor || f.started || f.callback == nil || f.snapshot == "" {
+	if f.closed || !f.monitor || f.started || f.callback == nil || f.snapshot == "" {
 		return
 	}
 	f.started = true
@@ -68,8 +105,13 @@ func (f *fileSource) startMonitorLocked() {
 func (f *fileSource) watch() {
 	ticker := time.NewTicker(f.pollInterval)
 	defer ticker.Stop()
-	for range ticker.C {
-		keys, snapshot, err := f.load()
+	for {
+		select {
+		case <-f.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		keys, snapshot, err := f.load(f.ctx)
 		if err != nil {
 			continue // a transient partial write must not evict usable keys
 		}
@@ -89,7 +131,10 @@ func (f *fileSource) watch() {
 	}
 }
 
-func (f *fileSource) load() ([]key.KeyCandidate, string, error) {
+func (f *fileSource) load(ctx context.Context) ([]key.KeyCandidate, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
 	files, err := sourceFiles(f.path)
 	if err != nil {
 		return nil, "", err
@@ -97,6 +142,9 @@ func (f *fileSource) load() ([]key.KeyCandidate, string, error) {
 	hash := sha256.New()
 	keys := make([]key.KeyCandidate, 0, len(files))
 	for _, path := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, "", err
+		}
 		encoded, err := os.ReadFile(path)
 		if err != nil {
 			return nil, "", fmt.Errorf("read key file %q: %w", path, err)

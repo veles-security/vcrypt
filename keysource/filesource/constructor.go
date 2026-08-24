@@ -1,6 +1,7 @@
 package filesource
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -50,10 +51,12 @@ func New(id, path string, options ...Option) (*fileSource, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("file source path is empty")
 	}
-	source := &fileSource{id: id, path: filepath.Clean(path), pollInterval: defaultFilePollInterval}
+	lifecycleContext, cancel := context.WithCancel(context.Background())
+	source := &fileSource{id: id, path: filepath.Clean(path), pollInterval: defaultFilePollInterval, ctx: lifecycleContext, cancel: cancel}
 	for _, option := range options {
 		if option != nil {
 			if err := option(source); err != nil {
+				cancel()
 				return nil, err
 			}
 		}

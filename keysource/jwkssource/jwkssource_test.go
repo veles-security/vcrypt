@@ -1,6 +1,8 @@
 package jwkssource
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,8 +91,111 @@ func Test_Source_Load(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, gotErr := source.Load()
+			defer source.Close()
+			got, gotErr := source.Load(context.Background())
 			tt.assertion(t, got, gotErr)
+		})
+	}
+	t.Run("Cancellation", testSourceLoadCancellation)
+}
+
+func testSourceLoadCancellation(t *testing.T) {
+	started := make(chan struct{}, 1)
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		started <- struct{}{}
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	})}
+	assertCanceled := func(t *testing.T, keys []key.KeyCandidate, err error) {
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Load() error = %v, want context.Canceled", err)
+		}
+		if keys != nil {
+			t.Errorf("Load() keys = %#v, want nil", keys)
+		}
+	}
+	assertNilContext := func(t *testing.T, keys []key.KeyCandidate, err error) {
+		if err == nil || keys != nil {
+			t.Errorf("Load() = (%#v, %v), want (nil, error)", keys, err)
+		}
+	}
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		cancel    bool
+		assertion func(*testing.T, []key.KeyCandidate, error)
+	}{
+		{name: "Canceled Request", ctx: context.Background(), cancel: true, assertion: assertCanceled},
+		{name: "Nil Context", ctx: nil, assertion: assertNilContext},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source, err := New("issuer", "https://issuer.example/jwks", time.Hour, WithHTTPClient(client))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer source.Close()
+			ctx := tt.ctx
+			var cancel context.CancelFunc
+			if tt.cancel {
+				ctx, cancel = context.WithCancel(ctx)
+				go func() {
+					<-started
+					cancel()
+				}()
+			}
+			got, gotErr := source.Load(ctx)
+			tt.assertion(t, got, gotErr)
+		})
+	}
+}
+
+func Test_Source_Close(t *testing.T) {
+	started := make(chan struct{})
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		close(started)
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	})}
+	source, err := New("issuer", "https://issuer.example/jwks", time.Hour, WithHTTPClient(client))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadResult := make(chan error, 1)
+	go func() {
+		_, err := source.Load(context.Background())
+		loadResult <- err
+	}()
+	<-started
+
+	assertClosed := func(t *testing.T, closeErr, loadErr error) {
+		if closeErr != nil {
+			t.Errorf("Close() error = %v", closeErr)
+		}
+		if !errors.Is(loadErr, context.Canceled) && !errors.Is(loadErr, ErrClosed) {
+			t.Errorf("in-flight Load() error = %v, want cancellation", loadErr)
+		}
+		if _, err := source.Load(context.Background()); !errors.Is(err, ErrClosed) {
+			t.Errorf("Load() after Close error = %v, want ErrClosed", err)
+		}
+	}
+	assertIdempotent := func(t *testing.T, closeErr, _ error) {
+		if closeErr != nil {
+			t.Errorf("second Close() error = %v", closeErr)
+		}
+	}
+	tests := []struct {
+		name      string
+		close     func() error
+		load      func() error
+		assertion func(*testing.T, error, error)
+	}{
+		{name: "Cancel In-flight Load", close: source.Close, load: func() error { return <-loadResult }, assertion: assertClosed},
+		{name: "Idempotent", close: source.Close, load: func() error { return nil }, assertion: assertIdempotent},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.assertion(t, tt.close(), tt.load())
 		})
 	}
 }
@@ -113,7 +218,8 @@ func Test_Source_SetRefreshCallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := source.Load(); err != nil {
+	defer source.Close()
+	if _, err := source.Load(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 

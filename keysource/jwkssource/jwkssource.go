@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,38 +19,87 @@ import (
 
 const maximumJWKSSize = 10 << 20
 
+// ErrClosed is returned when a load is attempted after the source is closed.
+var ErrClosed = errors.New("JWKS source is closed")
+
 // Source loads keys from a remote JSON Web Key Set endpoint and periodically
 // publishes changed sets through its refresh callback.
 type Source struct {
-	id        string
-	url       string
-	frequency time.Duration
-	client    *http.Client
-	decoder   vapi.Decoder[descriptor.JWKS[key.KeyCandidate], key.JOSEDecodeOption]
-	allowHTTP bool
+	id         string
+	url        string
+	frequency  time.Duration
+	client     *http.Client
+	ownsClient bool
+	decoder    vapi.Decoder[descriptor.JWKS[key.KeyCandidate], key.JOSEDecodeOption]
+	allowHTTP  bool
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	loadMu sync.Mutex
 	mu     sync.Mutex
 
 	callback func([]key.KeyCandidate) error
 	started  bool
+	closed   bool
 	snapshot string
 }
 
 // ID implements [keysource.Source].
 func (s *Source) ID() string { return s.id }
 
-// Load retrieves and decodes the current JSON Web Key Set.
-func (s *Source) Load() ([]key.KeyCandidate, error) {
-	keys, snapshot, err := s.load(context.Background())
+// Load retrieves and decodes the current JSON Web Key Set. Closing the source
+// also cancels the load.
+func (s *Source) Load(ctx context.Context) ([]key.KeyCandidate, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("load JWKS: nil context")
+	}
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil, ErrClosed
+	}
+	lifecycleContext := s.ctx
+	s.mu.Unlock()
+
+	requestContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if lifecycleContext != nil {
+		stop := context.AfterFunc(lifecycleContext, cancel)
+		defer stop()
+	}
+	keys, snapshot, err := s.load(requestContext)
 	if err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil, ErrClosed
+	}
 	s.snapshot = snapshot
 	s.startLocked()
 	s.mu.Unlock()
 	return keys, nil
+}
+
+// Close stops periodic refresh and cancels in-flight HTTP requests. It is safe
+// to call Close multiple times.
+func (s *Source) Close() error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	cancel := s.cancel
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if s.ownsClient && s.client != nil {
+		s.client.CloseIdleConnections()
+	}
+	return nil
 }
 
 // SetRefreshCallback supplies the callback used to replace keys after the
@@ -62,7 +112,7 @@ func (s *Source) SetRefreshCallback(callback func([]key.KeyCandidate) error) {
 }
 
 func (s *Source) startLocked() {
-	if s.started || s.callback == nil || s.snapshot == "" {
+	if s.closed || s.started || s.callback == nil || s.snapshot == "" {
 		return
 	}
 	s.started = true
@@ -72,8 +122,13 @@ func (s *Source) startLocked() {
 func (s *Source) watch() {
 	ticker := time.NewTicker(s.frequency)
 	defer ticker.Stop()
-	for range ticker.C {
-		keys, snapshot, err := s.load(context.Background())
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		keys, snapshot, err := s.load(s.ctx)
 		if err != nil {
 			continue
 		}

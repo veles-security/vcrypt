@@ -3,6 +3,7 @@
 package jwkssource
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/veles-security/vcrypt/descriptor"
 )
+
+const defaultHTTPTimeout = 30 * time.Second
 
 // Option configures a JWKS source.
 type Option func(*Source) error
@@ -26,13 +29,15 @@ func WithInsecureHTTP() Option {
 }
 
 // WithHTTPClient configures the client used to request the JWKS endpoint. The
-// caller retains ownership of the client and its transport.
+// caller retains ownership of the client and its transport. Supplying a client
+// also makes the caller responsible for configuring its timeout policy.
 func WithHTTPClient(client *http.Client) Option {
 	return func(source *Source) error {
 		if client == nil {
 			return fmt.Errorf("JWKS source HTTP client is nil")
 		}
 		source.client = client
+		source.ownsClient = false
 		return nil
 	}
 }
@@ -50,21 +55,27 @@ func New(id, rawURL string, frequency time.Duration, options ...Option) (*Source
 		return nil, fmt.Errorf("JWKS source frequency must be positive")
 	}
 
+	lifecycleContext, cancel := context.WithCancel(context.Background())
 	source := &Source{
-		id:        id,
-		url:       parsedURL.String(),
-		frequency: frequency,
-		client:    http.DefaultClient,
-		decoder:   descriptor.NewJWKSDecoder(),
+		id:         id,
+		url:        parsedURL.String(),
+		frequency:  frequency,
+		client:     &http.Client{Timeout: defaultHTTPTimeout},
+		ownsClient: true,
+		decoder:    descriptor.NewJWKSDecoder(),
+		ctx:        lifecycleContext,
+		cancel:     cancel,
 	}
 	for _, option := range options {
 		if option != nil {
 			if err := option(source); err != nil {
+				cancel()
 				return nil, err
 			}
 		}
 	}
 	if parsedURL.Scheme == "http" && !source.allowHTTP {
+		cancel()
 		return nil, fmt.Errorf("JWKS source URL %q uses insecure HTTP; use WithInsecureHTTP to permit it", rawURL)
 	}
 	return source, nil

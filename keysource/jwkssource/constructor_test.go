@@ -89,6 +89,20 @@ func Test_New(t *testing.T) {
 			t.Errorf("New() source = %#v, want explicitly allowed HTTP source", source)
 		}
 	}
+	assertDefaultSource := func(t *testing.T, source *Source, err error) {
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if source.client == http.DefaultClient {
+			t.Error("New() client = http.DefaultClient, want source-owned client")
+		}
+		if source.client.Timeout != defaultHTTPTimeout {
+			t.Errorf("New() timeout = %v, want %v", source.client.Timeout, defaultHTTPTimeout)
+		}
+		if source.ctx == nil || source.cancel == nil {
+			t.Error("New() lifecycle context was not configured")
+		}
+	}
 	tests := []struct {
 		name      string
 		id        string
@@ -98,6 +112,7 @@ func Test_New(t *testing.T) {
 		assertion func(*testing.T, *Source, error)
 	}{
 		{name: "Source", id: "issuer", url: "https://issuer.example/jwks", frequency: time.Minute, options: []Option{nil, WithHTTPClient(client)}, assertion: assertSource},
+		{name: "Default Timeout", id: "issuer", url: "https://issuer.example/jwks", frequency: time.Minute, assertion: assertDefaultSource},
 		{name: "Explicitly Allowed HTTP", id: "issuer", url: "http://issuer.example/jwks", frequency: time.Minute, options: []Option{WithInsecureHTTP()}, assertion: assertHTTPSource},
 		{name: "HTTP Rejected By Default", id: "issuer", url: "http://issuer.example/jwks", frequency: time.Minute, assertion: assertError},
 		{name: "Empty ID", url: "https://issuer.example/jwks", frequency: time.Minute, assertion: assertError},
@@ -111,6 +126,9 @@ func Test_New(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotErr := New(tt.id, tt.url, tt.frequency, tt.options...)
 			tt.assertion(t, got, gotErr)
+			if got != nil {
+				_ = got.Close()
+			}
 		})
 	}
 }

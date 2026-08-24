@@ -77,7 +77,7 @@ func (m *store) Bind(source keysource.Source) error {
 
 	m.bindSelfRefreshing(source)
 
-	candidates, err := source.Load()
+	candidates, err := source.Load(context.Background())
 	var keys []key.Key
 	if err != nil {
 		err = fmt.Errorf("failed to load keys from source %s: %w", id, err)
@@ -125,7 +125,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			candidates, err := source.Load()
+			candidates, err := source.Load(context.Background())
 			if err != nil {
 				errs <- fmt.Errorf("failed to load keys from source %s: %w", source.ID(), err)
 				return
