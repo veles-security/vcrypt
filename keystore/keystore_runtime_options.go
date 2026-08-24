@@ -10,15 +10,14 @@ type operationQuery struct {
 // SignOption configures key selection for a signing operation.
 type SignOption func(*operationQuery) error
 
-// VerifyOption configures key selection for a signature verification
-// operation.
-type VerifyOption = SignOption
+// VerifyOption configures key selection for a signature verification operation.
+type VerifyOption = func(*operationQuery) error
 
 // EncryptOption configures key selection for an encryption operation.
-type EncryptOption = SignOption
+type EncryptOption = func(*operationQuery) error
 
 // DecryptOption configures key selection for a decryption operation.
-type DecryptOption = SignOption
+type DecryptOption = func(*operationQuery) error
 
 // WithKeys restricts an operation to keys matching selector.
 func WithKeys(selector KeySelector) SignOption {
