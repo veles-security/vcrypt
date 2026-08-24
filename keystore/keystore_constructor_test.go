@@ -89,7 +89,7 @@ func Test_New(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			options := append([]Option(nil), tt.options...)
 			for _, source := range tt.sources {
-				options = append(options, WithSource(source))
+				options = append(options, WithSource(source, nil))
 			}
 			got, gotErr := New(options...)
 			tt.assertion(t, got, gotErr, tt.sources...)
@@ -114,13 +114,12 @@ func Test_WithSource(t *testing.T) {
 		options   []Option
 		assertion func(*testing.T, Store, error)
 	}{
-		{name: "Source", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"})}, assertion: assertValid},
+		{name: "Source", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"}, nil)}, assertion: assertValid},
 		{name: "Source And Nil Constructor Error", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"}, nil)}, assertion: assertValid},
 		{name: "Constructor Error", options: []Option{WithSource(nil, sourceErr)}, assertion: assertError},
-		{name: "Nil Source", options: []Option{WithSource(nil)}, assertion: assertError},
-		{name: "Empty Source ID", options: []Option{WithSource(&selfRefreshingSourceStub{id: " "})}, assertion: assertError},
-		{name: "Duplicate Source ID", options: []Option{WithSource(&selfRefreshingSourceStub{id: "same"}), WithSource(&selfRefreshingSourceStub{id: "same"})}, assertion: assertError},
-		{name: "Multiple Constructor Errors", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"}, nil, nil)}, assertion: assertError},
+		{name: "Nil Source", options: []Option{WithSource(nil, nil)}, assertion: assertError},
+		{name: "Empty Source ID", options: []Option{WithSource(&selfRefreshingSourceStub{id: " "}, nil)}, assertion: assertError},
+		{name: "Duplicate Source ID", options: []Option{WithSource(&selfRefreshingSourceStub{id: "same"}, nil), WithSource(&selfRefreshingSourceStub{id: "same"}, nil)}, assertion: assertError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

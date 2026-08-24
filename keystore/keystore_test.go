@@ -42,7 +42,7 @@ func Test_store_Close(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			options := make([]Option, 0, len(tt.sources))
 			for _, source := range tt.sources {
-				options = append(options, WithSource(source))
+				options = append(options, WithSource(source, nil))
 			}
 			store, err := New(options...)
 			if err != nil {
