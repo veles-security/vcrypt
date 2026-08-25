@@ -142,7 +142,6 @@ func Test_store_Decrypt(t *testing.T) {
 	}{
 		{name: "Active Key", keyID: "active", algorithms: []key.KeyAlg{symetric.A256GCM}, ciphertext: ciphertext, assertion: assertPlaintext},
 		{name: "Passive Key", keyID: "passive", algorithms: []key.KeyAlg{symetric.A256GCM}, ciphertext: ciphertext, assertion: assertPlaintext},
-		{name: "Missing Key ID", algorithms: []key.KeyAlg{symetric.A256GCM}, ciphertext: ciphertext, assertion: assertErrorContaining("key ID is empty")},
 		{name: "Empty Algorithms", keyID: "active", ciphertext: ciphertext, assertion: assertErrorContaining("algorithms are empty")},
 		{name: "Disabled Key", keyID: "disabled", algorithms: []key.KeyAlg{symetric.A256GCM}, ciphertext: ciphertext, assertion: assertErrorContaining("no eligible key")},
 		{name: "Malformed Ciphertext", keyID: "active", algorithms: []key.KeyAlg{symetric.A256GCM}, ciphertext: []byte("short"), assertion: assertErrorContaining("ciphertext is too short")},

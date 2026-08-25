@@ -33,3 +33,10 @@ func WithSource(source keysource.Source, sourceError error) Option {
 		return nil
 	}
 }
+
+func WithRuntimeOptions(options ...KeystoreRuntimeOption) Option {
+	return func(store *store) error {
+		store.runtimeOptions = append(store.runtimeOptions, options...)
+		return nil
+	}
+}

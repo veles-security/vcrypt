@@ -27,10 +27,11 @@ type Keystore interface {
 }
 
 type store struct {
-	repository Repository
-	sources    map[string]keysource.Source
-	loading    map[string]struct{}
-	sourcesMU  sync.RWMutex
+	repository     Repository
+	sources        map[string]keysource.Source
+	loading        map[string]struct{}
+	sourcesMU      sync.RWMutex
+	runtimeOptions []KeystoreRuntimeOption
 }
 
 // Close stops all sources owned by the store and releases their resources.

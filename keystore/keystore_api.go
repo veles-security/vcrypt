@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/veles-security/vcrypt/key"
@@ -20,10 +19,14 @@ type SignResult struct {
 // Sign selects an active key that supports one of the requested algorithms and
 // signs message with it.
 func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
-	request, err := applyOperationQuery(options)
-	if err != nil {
-		return SignResult{}, fmt.Errorf("keystore: apply signing option: %w", err)
+	var request operationQuery
+	for _, option := range k.runtimeOptions {
+		option(&request)
 	}
+	for _, option := range options {
+		option(&request)
+	}
+
 	if len(request.Algorithms) == 0 {
 		return SignResult{}, fmt.Errorf("keystore: signing algorithms are empty")
 	}
@@ -51,13 +54,14 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 // VerifySignature selects a key and verifies signature. Active and passive
 // keys are eligible for verification.
 func (k *store) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
-	request, err := applyOperationQuery(options)
-	if err != nil {
-		return fmt.Errorf("keystore: apply verification option: %w", err)
+	var request operationQuery
+	for _, option := range k.runtimeOptions {
+		option(&request)
 	}
-	if strings.TrimSpace(request.Keys.ID) == "" {
-		return fmt.Errorf("keystore: verification key ID is empty")
+	for _, option := range options {
+		option(&request)
 	}
+
 	if len(request.Algorithms) == 0 {
 		return fmt.Errorf("keystore: verification algorithm is empty")
 	}
@@ -92,10 +96,14 @@ type EncryptResult struct {
 // Encrypt selects an active key that supports one of the requested algorithms
 // and encrypts plaintext with it.
 func (k *store) Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error) {
-	request, err := applyOperationQuery(options)
-	if err != nil {
-		return EncryptResult{}, fmt.Errorf("keystore: apply encryption option: %w", err)
+	var request operationQuery
+	for _, option := range k.runtimeOptions {
+		option(&request)
 	}
+	for _, option := range options {
+		option(&request)
+	}
+
 	if len(request.Algorithms) == 0 {
 		return EncryptResult{}, fmt.Errorf("keystore: encryption algorithms are empty")
 	}
@@ -117,13 +125,14 @@ func (k *store) Encrypt(ctx context.Context, plaintext []byte, options ...Encryp
 
 // Decrypt selects an active or passive key and decrypts ciphertext with it.
 func (k *store) Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error) {
-	request, err := applyOperationQuery(options)
-	if err != nil {
-		return nil, fmt.Errorf("keystore: apply decryption option: %w", err)
+	var request operationQuery
+	for _, option := range k.runtimeOptions {
+		option(&request)
 	}
-	if strings.TrimSpace(request.Keys.ID) == "" {
-		return nil, fmt.Errorf("keystore: decryption key ID is empty")
+	for _, option := range options {
+		option(&request)
 	}
+
 	if len(request.Algorithms) == 0 {
 		return nil, fmt.Errorf("keystore: decryption algorithms are empty")
 	}
