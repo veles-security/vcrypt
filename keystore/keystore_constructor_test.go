@@ -49,7 +49,7 @@ func (s *selfRefreshingSourceStub) SetRefreshCallback(callback func([]key.KeyCan
 func Test_New(t *testing.T) {
 	loadErr := errors.New("load failed")
 	optionErr := errors.New("option failed")
-	assertActivated := func(t *testing.T, store Store, err error, sources ...*selfRefreshingSourceStub) {
+	assertActivated := func(t *testing.T, store Keystore, err error, sources ...*selfRefreshingSourceStub) {
 		if err != nil || store == nil {
 			t.Fatalf("New() = (%v, %v), want store", store, err)
 		}
@@ -59,7 +59,7 @@ func Test_New(t *testing.T) {
 			}
 		}
 	}
-	assertNotActivated := func(t *testing.T, store Store, err error, sources ...*selfRefreshingSourceStub) {
+	assertNotActivated := func(t *testing.T, store Keystore, err error, sources ...*selfRefreshingSourceStub) {
 		if err == nil || store != nil {
 			t.Fatalf("New() = (%v, %v), want (nil, error)", store, err)
 		}
@@ -76,7 +76,7 @@ func Test_New(t *testing.T) {
 		name      string
 		sources   []*selfRefreshingSourceStub
 		options   []Option
-		assertion func(*testing.T, Store, error, ...*selfRefreshingSourceStub)
+		assertion func(*testing.T, Keystore, error, ...*selfRefreshingSourceStub)
 	}{
 		{name: "No Options", assertion: assertActivated},
 		{name: "Successful Sources Activated", sources: []*selfRefreshingSourceStub{{id: "first"}, {id: "second"}}, assertion: assertActivated},
@@ -99,12 +99,12 @@ func Test_New(t *testing.T) {
 
 func Test_WithSource(t *testing.T) {
 	sourceErr := errors.New("source construction failed")
-	assertValid := func(t *testing.T, store Store, err error) {
+	assertValid := func(t *testing.T, store Keystore, err error) {
 		if err != nil || store == nil {
 			t.Fatalf("New() = (%v, %v), want store", store, err)
 		}
 	}
-	assertError := func(t *testing.T, store Store, err error) {
+	assertError := func(t *testing.T, store Keystore, err error) {
 		if err == nil || store != nil {
 			t.Fatalf("New() = (%v, %v), want (nil, error)", store, err)
 		}
@@ -112,7 +112,7 @@ func Test_WithSource(t *testing.T) {
 	tests := []struct {
 		name      string
 		options   []Option
-		assertion func(*testing.T, Store, error)
+		assertion func(*testing.T, Keystore, error)
 	}{
 		{name: "Source", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"}, nil)}, assertion: assertValid},
 		{name: "Source And Nil Constructor Error", options: []Option{WithSource(&selfRefreshingSourceStub{id: "first"}, nil)}, assertion: assertValid},

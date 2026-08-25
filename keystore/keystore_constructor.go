@@ -6,7 +6,7 @@ import (
 	"github.com/veles-security/vcrypt/keysource"
 )
 
-func New(options ...Option) (Store, error) {
+func New(options ...Option) (Keystore, error) {
 	m := &store{
 		repository: NewRepository(),
 		sources:    map[string]keysource.Source{},

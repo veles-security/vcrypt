@@ -7,20 +7,22 @@ type operationQuery struct {
 	Algorithms []key.KeyAlg
 }
 
+type KeystoreRuntimeOption func(*operationQuery) error
+
 // SignOption configures key selection for a signing operation.
-type SignOption func(*operationQuery) error
+type SignOption KeystoreRuntimeOption
 
 // VerifyOption configures key selection for a signature verification operation.
-type VerifyOption = func(*operationQuery) error
+type VerifyOption = KeystoreRuntimeOption
 
 // EncryptOption configures key selection for an encryption operation.
-type EncryptOption = func(*operationQuery) error
+type EncryptOption = KeystoreRuntimeOption
 
 // DecryptOption configures key selection for a decryption operation.
-type DecryptOption = func(*operationQuery) error
+type DecryptOption = KeystoreRuntimeOption
 
 // WithKeys restricts an operation to keys matching selector.
-func WithKeys(selector KeySelector) SignOption {
+func WithKeys(selector KeySelector) KeystoreRuntimeOption {
 	return func(options *operationQuery) error {
 		options.Keys = selector
 		return nil
@@ -28,7 +30,7 @@ func WithKeys(selector KeySelector) SignOption {
 }
 
 // WithAlgorithms sets algorithms in order of preference.
-func WithAlgorithms(algorithms ...key.KeyAlg) SignOption {
+func WithAlgorithms(algorithms ...key.KeyAlg) KeystoreRuntimeOption {
 	return func(options *operationQuery) error {
 		options.Algorithms = append([]key.KeyAlg(nil), algorithms...)
 		return nil

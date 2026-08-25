@@ -15,7 +15,7 @@ import (
 	"github.com/veles-security/vcrypt/keysource"
 )
 
-type Store interface {
+type Keystore interface {
 	Repository
 	Close() error
 	Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error)
@@ -24,6 +24,13 @@ type Store interface {
 	Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error)
 	Bind(source keysource.Source) error
 	RefreshAll() error
+}
+
+type store struct {
+	repository Repository
+	sources    map[string]keysource.Source
+	loading    map[string]struct{}
+	sourcesMU  sync.RWMutex
 }
 
 // Close stops all sources owned by the store and releases their resources.
@@ -42,34 +49,12 @@ func (m *store) Close() error {
 	return result
 }
 
-type store struct {
-	repository Repository
-	sources    map[string]keysource.Source
-	loading    map[string]struct{}
-	sourcesMU  sync.RWMutex
-}
-
 func (m *store) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
 	return m.repository.Find(ctx, selector)
 }
+
 func (m *store) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
 	return m.repository.Replace(ctx, keys, selector)
-}
-
-func (m *store) bindSelfRefreshing(source keysource.Source) {
-	id := source.ID()
-	if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
-		selfRefreshing.SetRefreshCallback(func(candidates []key.KeyCandidate) error {
-			keys, err := m.buildCandidates(candidates)
-			if err != nil {
-				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
-			}
-			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(id))); err != nil {
-				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
-			}
-			return nil
-		})
-	}
 }
 
 // Bind implements [Manager].
@@ -138,6 +123,22 @@ func (m *store) RefreshAll() error {
 	return m.loadSources(sources)
 }
 
+func (m *store) bindSelfRefreshing(source keysource.Source) {
+	id := source.ID()
+	if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
+		selfRefreshing.SetRefreshCallback(func(candidates []key.KeyCandidate) error {
+			keys, err := m.buildCandidates(candidates)
+			if err != nil {
+				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
+			}
+			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(id))); err != nil {
+				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
+			}
+			return nil
+		})
+	}
+}
+
 func (m *store) loadSources(sources []keysource.Source) error {
 	errs := make(chan error, len(sources))
 	var wg sync.WaitGroup
@@ -182,4 +183,4 @@ func (m *store) buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error
 	return keys, nil
 }
 
-var _ Store = &store{}
+var _ Keystore = &store{}

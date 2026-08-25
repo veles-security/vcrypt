@@ -24,7 +24,7 @@ func encryptionKey(t *testing.T, id string, status key.KeyStatus, secret []byte)
 	return key.New(key.KeyCandidate{ID: id, Status: status, Material: keyMaterial}, keyBackend)
 }
 
-func encryptionStore(t *testing.T, keys ...key.Key) Store {
+func encryptionStore(t *testing.T, keys ...key.Key) Keystore {
 	t.Helper()
 	store, err := New()
 	if err != nil {
@@ -85,7 +85,7 @@ func Test_store_Encrypt(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		store      Store
+		store      Keystore
 		ctx        context.Context
 		algorithms []key.KeyAlg
 		assertion  func(*testing.T, EncryptResult, error)

@@ -31,7 +31,7 @@ import (
 	"github.com/veles-security/vcrypt/keystore"
 )
 
-func newKeyStore() (keystore.Store, error) {
+func newKeyStore() (keystore.Keystore, error) {
 	return keystore.New(
 		keystore.WithSource(randomsource.New(
 			"token-signing",
@@ -46,7 +46,7 @@ func newKeyStore() (keystore.Store, error) {
 	)
 }
 
-func signPayload(ctx context.Context, keys keystore.Store, payload []byte) (keystore.SignResult, error) {
+func signPayload(ctx context.Context, keys keystore.Keystore, payload []byte) (keystore.SignResult, error) {
 	return keys.Sign(
 		ctx,
 		payload,
@@ -57,7 +57,7 @@ func signPayload(ctx context.Context, keys keystore.Store, payload []byte) (keys
 
 func verifyPartnerPayload(
 	ctx context.Context,
-	keys keystore.Store,
+	keys keystore.Keystore,
 	keyID string,
 	payload, signature []byte,
 ) error {

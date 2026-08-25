@@ -9,7 +9,7 @@ import (
 
 func Test_store_Close(t *testing.T) {
 	closeErr := errors.New("close failed")
-	assertClosed := func(t *testing.T, store Store, sources ...*selfRefreshingSourceStub) {
+	assertClosed := func(t *testing.T, store Keystore, sources ...*selfRefreshingSourceStub) {
 		if err := store.Close(); err != nil {
 			t.Fatalf("Close() error = %v", err)
 		}
@@ -19,7 +19,7 @@ func Test_store_Close(t *testing.T) {
 			}
 		}
 	}
-	assertError := func(t *testing.T, store Store, sources ...*selfRefreshingSourceStub) {
+	assertError := func(t *testing.T, store Keystore, sources ...*selfRefreshingSourceStub) {
 		if err := store.Close(); !errors.Is(err, closeErr) {
 			t.Errorf("Close() error = %v, want %v", err, closeErr)
 		}
@@ -32,7 +32,7 @@ func Test_store_Close(t *testing.T) {
 	tests := []struct {
 		name      string
 		sources   []*selfRefreshingSourceStub
-		assertion func(*testing.T, Store, ...*selfRefreshingSourceStub)
+		assertion func(*testing.T, Keystore, ...*selfRefreshingSourceStub)
 	}{
 		{name: "No Sources", assertion: assertClosed},
 		{name: "All Sources", sources: []*selfRefreshingSourceStub{{id: "first"}, {id: "second"}}, assertion: assertClosed},

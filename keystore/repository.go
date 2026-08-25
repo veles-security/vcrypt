@@ -24,17 +24,17 @@ func NewRepository() Repository {
 }
 
 // Find implements [Repository].
-func (k *repository) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
+func (r *repository) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	k.mu.RLock()
-	defer k.mu.RUnlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-	result := make([]key.Key, 0, len(k.keys))
-	for i := range k.keys {
-		candidate := &k.keys[i]
+	result := make([]key.Key, 0, len(r.keys))
+	for i := range r.keys {
+		candidate := &r.keys[i]
 		if selector.matches(candidate) {
 			result = append(result, *candidate)
 		}
@@ -43,23 +43,23 @@ func (k *repository) Find(ctx context.Context, selector KeySelector) ([]key.Key,
 }
 
 // Replace implements [Repository].
-func (k *repository) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
+func (r *repository) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	k.mu.Lock()
-	defer k.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	kept := k.keys[:0]
-	for i := range k.keys {
-		candidate := &k.keys[i]
+	kept := r.keys[:0]
+	for i := range r.keys {
+		candidate := &r.keys[i]
 		if !selector.matches(candidate) {
 			kept = append(kept, *candidate)
 		}
 	}
 	kept = append(kept, keys...)
-	k.keys = kept
+	r.keys = kept
 	return nil
 }
 
