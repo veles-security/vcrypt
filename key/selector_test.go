@@ -233,6 +233,42 @@ func Test_WithStatus(t *testing.T) {
 	}
 }
 
+func Test_WithoutStatus(t *testing.T) {
+	// keys
+	unset := New(KeyCandidate{}, nil)
+	active := New(KeyCandidate{Status: KeyStatusActive}, nil)
+	disabled := New(KeyCandidate{Status: KeyStatusDisabled}, nil)
+
+	// assertions
+	assertMatch := func(t *testing.T, matched bool) {
+		if !matched {
+			t.Error("WithoutStatus() = false, want true")
+		}
+	}
+	assertNoMatch := func(t *testing.T, matched bool) {
+		if matched {
+			t.Error("WithoutStatus() = true, want false")
+		}
+	}
+	tests := []struct {
+		name      string
+		status    KeyStatus
+		candidate Key
+		assertion func(*testing.T, bool)
+	}{
+		{name: "Unset Status", status: KeyStatusDisabled, candidate: unset, assertion: assertMatch},
+		{name: "Different Status", status: KeyStatusDisabled, candidate: active, assertion: assertMatch},
+		{name: "Matching Status", status: KeyStatusDisabled, candidate: disabled, assertion: assertNoMatch},
+		{name: "Exclude Unset Status", candidate: unset, assertion: assertNoMatch},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matched := WithoutStatus(tt.status)(tt.candidate)
+			tt.assertion(t, matched)
+		})
+	}
+}
+
 func Test_WithValidityAt(t *testing.T) {
 	// times
 	now := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)

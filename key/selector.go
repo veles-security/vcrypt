@@ -64,6 +64,14 @@ func WithStatus(statuses ...KeyStatus) SelectorOption {
 	}
 }
 
+// WithoutStatus restricts selection to keys whose status differs from status.
+// An unset status matches unless status is itself the zero value.
+func WithoutStatus(status KeyStatus) SelectorOption {
+	return func(candidate Key) bool {
+		return candidate.Status() != status
+	}
+}
+
 // WithValidityAt restricts selection to keys valid at the supplied instant.
 // A zero key validity bound is treated as unspecified.
 func WithValidityAt(at time.Time) SelectorOption {

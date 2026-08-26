@@ -174,13 +174,9 @@ func (k *store) selectKey(
 	})
 
 	now := time.Now()
-	statuses := []key.KeyStatus{key.KeyStatusActive, key.KeyStatusPassive}
-	if operation == key.KeyOpSign || operation == key.KeyOpEncrypt {
-		statuses = []key.KeyStatus{key.KeyStatusActive}
-	}
 	for _, algorithm := range algorithms {
 		eligible := selector.And(
-			key.WithStatus(statuses...),
+			key.WithoutStatus(key.KeyStatusDisabled),
 			key.WithValidityAt(now),
 			key.WithCapability(key.Capability{
 				Use:       useForOperation(operation),
@@ -188,6 +184,9 @@ func (k *store) selectKey(
 				Algorithm: algorithm,
 			}),
 		)
+		if operation == key.KeyOpSign || operation == key.KeyOpEncrypt {
+			eligible = eligible.And(key.WithoutStatus(key.KeyStatusPassive))
+		}
 		var matches []key.Key
 		for _, candidate := range candidates {
 			if eligible.Matches(candidate) {

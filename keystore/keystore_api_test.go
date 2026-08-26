@@ -53,6 +53,7 @@ func Test_store_Encrypt(t *testing.T) {
 	secret := bytes.Repeat([]byte{0x42}, 32)
 	plaintext := []byte("confidential message")
 	activeStore := encryptionStore(t, encryptionKey(t, "active", key.KeyStatusActive, secret))
+	unsetStatusStore := encryptionStore(t, encryptionKey(t, "active", "", secret))
 	passiveStore := encryptionStore(t, encryptionKey(t, "passive", key.KeyStatusPassive, secret))
 	canceledContext, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -91,6 +92,7 @@ func Test_store_Encrypt(t *testing.T) {
 		assertion  func(*testing.T, EncryptResult, error)
 	}{
 		{name: "AES-GCM", store: activeStore, ctx: context.Background(), algorithms: []key.KeyAlg{symetric.A256GCM}, assertion: assertEncrypted},
+		{name: "Unset Status", store: unsetStatusStore, ctx: context.Background(), algorithms: []key.KeyAlg{symetric.A256GCM}, assertion: assertEncrypted},
 		{name: "Empty Algorithms", store: activeStore, ctx: context.Background(), assertion: assertErrorContaining("algorithms are empty")},
 		{name: "Unsupported Algorithm", store: activeStore, ctx: context.Background(), algorithms: []key.KeyAlg{"unsupported"}, assertion: assertErrorContaining("no eligible key")},
 		{name: "Passive Key", store: passiveStore, ctx: context.Background(), algorithms: []key.KeyAlg{symetric.A256GCM}, assertion: assertErrorContaining("no eligible key")},
