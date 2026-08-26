@@ -29,25 +29,52 @@ type Keystore interface {
 type store struct {
 	repository     Repository
 	sources        map[string]keysource.Source
-	loading        map[string]struct{}
+	loading        map[string]keysource.Source
 	sourcesMU      sync.RWMutex
+	bindWG         sync.WaitGroup
+	closeOnce      sync.Once
+	closeErr       error
+	closed         bool
 	runtimeOptions []KeystoreRuntimeOption
 }
 
-// Close stops all sources owned by the store and releases their resources.
-func (m *store) Close() error {
-	m.sourcesMU.RLock()
-	sources := make([]keysource.Source, 0, len(m.sources))
-	for _, source := range m.sources {
-		sources = append(sources, source)
-	}
-	m.sourcesMU.RUnlock()
+// ErrClosed is returned when a source-management operation is attempted after
+// the keystore has been closed.
+var ErrClosed = errors.New("keystore is closed")
 
-	var result error
-	for _, source := range sources {
-		result = errors.Join(result, source.Close())
-	}
-	return result
+// Close stops all sources owned by the store and releases their resources.
+// Subsequent calls to Bind and RefreshAll return ErrClosed.
+func (m *store) Close() error {
+	m.closeOnce.Do(func() {
+		m.sourcesMU.Lock()
+		m.closed = true
+		loading := make([]keysource.Source, 0, len(m.loading))
+		for _, source := range m.loading {
+			loading = append(loading, source)
+		}
+		m.sourcesMU.Unlock()
+
+		// Cancel loads already in progress, then wait until no Bind call can add
+		// another source before taking the final source snapshot.
+		for _, source := range loading {
+			m.closeErr = errors.Join(m.closeErr, source.Close())
+		}
+		m.bindWG.Wait()
+
+		m.sourcesMU.RLock()
+		sources := make([]keysource.Source, 0, len(m.sources))
+		for _, source := range m.sources {
+			sources = append(sources, source)
+		}
+		m.sourcesMU.RUnlock()
+		for _, source := range sources {
+			if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
+				selfRefreshing.SetRefreshCallback(nil)
+			}
+			m.closeErr = errors.Join(m.closeErr, source.Close())
+		}
+	})
+	return m.closeErr
 }
 
 func (m *store) Find(ctx context.Context, selector key.Selector) ([]key.Key, error) {
@@ -69,6 +96,10 @@ func (m *store) Bind(source keysource.Source) error {
 	}
 
 	m.sourcesMU.Lock()
+	if m.closed {
+		m.sourcesMU.Unlock()
+		return ErrClosed
+	}
 	_, bound := m.sources[id]
 	_, loading := m.loading[id]
 	if bound || loading {
@@ -77,8 +108,10 @@ func (m *store) Bind(source keysource.Source) error {
 	}
 	// Reserve the ID before doing I/O, but do not expose the source to refreshes
 	// until its initial load has completed.
-	m.loading[id] = struct{}{}
+	m.loading[id] = source
+	m.bindWG.Add(1)
 	m.sourcesMU.Unlock()
+	defer m.bindWG.Done()
 
 	candidates, err := source.Load(context.Background())
 	var keys []key.Key
@@ -90,16 +123,18 @@ func (m *store) Bind(source keysource.Source) error {
 			err = fmt.Errorf("failed to build keys from source %s: %w", id, err)
 		}
 	}
+	m.sourcesMU.Lock()
+	delete(m.loading, id)
+	if err == nil && m.closed {
+		err = ErrClosed
+	}
 	if err == nil {
 		err = m.repository.Replace(context.Background(), keys, key.Select(key.WithSource(id)))
 		if err != nil {
 			err = fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
+		} else {
+			m.sources[id] = source
 		}
-	}
-	m.sourcesMU.Lock()
-	delete(m.loading, id)
-	if err == nil {
-		m.sources[id] = source
 	}
 	m.sourcesMU.Unlock()
 	if err != nil {
@@ -114,13 +149,17 @@ func (m *store) Bind(source keysource.Source) error {
 // RefreshAll implements [Manager].
 func (m *store) RefreshAll() error {
 	m.sourcesMU.RLock()
-	defer m.sourcesMU.RUnlock()
+	if m.closed {
+		m.sourcesMU.RUnlock()
+		return ErrClosed
+	}
 	sources := make([]keysource.Source, 0, len(m.sources))
 	for _, source := range m.sources {
 		if _, ok := source.(keysource.SelfRefreshingSource); !ok {
 			sources = append(sources, source)
 		}
 	}
+	m.sourcesMU.RUnlock()
 	return m.loadSources(sources)
 }
 
@@ -128,6 +167,11 @@ func (m *store) bindSelfRefreshing(source keysource.Source) {
 	id := source.ID()
 	if selfRefreshing, ok := source.(keysource.SelfRefreshingSource); ok {
 		selfRefreshing.SetRefreshCallback(func(candidates []key.KeyCandidate) error {
+			m.sourcesMU.RLock()
+			defer m.sourcesMU.RUnlock()
+			if m.closed {
+				return ErrClosed
+			}
 			keys, err := m.buildCandidates(candidates)
 			if err != nil {
 				return fmt.Errorf("failed to build keys from source %s: %w", id, err)

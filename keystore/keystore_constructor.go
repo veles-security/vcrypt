@@ -10,7 +10,7 @@ func New(options ...Option) (Keystore, error) {
 	m := &store{
 		repository:     NewRepository(),
 		sources:        map[string]keysource.Source{},
-		loading:        map[string]struct{}{},
+		loading:        map[string]keysource.Source{},
 		runtimeOptions: []KeystoreRuntimeOption{},
 	}
 	for _, option := range options {
