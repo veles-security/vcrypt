@@ -13,9 +13,9 @@ type KeySelector struct {
 // KeySelectorOption configures a [KeySelector].
 type KeySelectorOption func(*KeySelector)
 
-// Select builds a key selector that can be reused by repository queries and
+// WithKeySelector builds a key selector that can be reused by repository queries and
 // cryptographic operations.
-func Select(options ...KeySelectorOption) KeySelector {
+func WithKeySelector(options ...KeySelectorOption) KeySelector {
 	var selector KeySelector
 	for _, option := range options {
 		if option != nil {

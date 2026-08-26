@@ -91,7 +91,7 @@ func (m *store) Bind(source keysource.Source) error {
 		}
 	}
 	if err == nil {
-		err = m.repository.Replace(context.Background(), keys, Select(WithKeySource(id)))
+		err = m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(id)))
 		if err != nil {
 			err = fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 		}
@@ -132,7 +132,7 @@ func (m *store) bindSelfRefreshing(source keysource.Source) {
 			if err != nil {
 				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
 			}
-			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(id))); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(id))); err != nil {
 				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 			}
 			return nil
@@ -157,7 +157,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 				errs <- fmt.Errorf("failed to build keys from source %s: %w", source.ID(), err)
 				return
 			}
-			if err := m.repository.Replace(context.Background(), keys, Select(WithKeySource(source.ID()))); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(source.ID()))); err != nil {
 				errs <- fmt.Errorf("failed to store keys from source %s in keystore: %w", source.ID(), err)
 			}
 		}()
