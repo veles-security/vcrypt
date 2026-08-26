@@ -1,6 +1,9 @@
 package key
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 type selectorBackend struct {
 	capabilities []Capability
@@ -48,6 +51,49 @@ func Test_Select(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			selector := Select(tt.options...)
 			tt.assertion(t, selector)
+		})
+	}
+}
+
+func Test_Selector_And(t *testing.T) {
+	// keys
+	selected := New(KeyCandidate{ID: "selected", Owner: "owner"}, nil)
+	differentOwner := New(KeyCandidate{ID: "selected", Owner: "other"}, nil)
+	// selectors
+	base := Select(WithID("selected"))
+
+	// assertions
+	assertMatch := func(t *testing.T, selector Selector) {
+		if !selector.Matches(selected) {
+			t.Error("And().Matches() = false, want true")
+		}
+	}
+	assertNoMatch := func(t *testing.T, selector Selector) {
+		if selector.Matches(differentOwner) {
+			t.Error("And().Matches() = true, want false")
+		}
+	}
+	assertReceiverUnchanged := func(t *testing.T, _ Selector) {
+		if !base.Matches(selected) {
+			t.Error("And() modified the receiver")
+		}
+	}
+	tests := []struct {
+		name      string
+		selector  Selector
+		options   []SelectorOption
+		assertion func(*testing.T, Selector)
+	}{
+		{name: "Add Matching Condition", selector: base, options: []SelectorOption{WithOwner("owner")}, assertion: assertMatch},
+		{name: "Add Mismatched Condition", selector: base, options: []SelectorOption{WithOwner("owner")}, assertion: assertNoMatch},
+		{name: "Ignore Nil Condition", selector: base, options: []SelectorOption{nil}, assertion: assertMatch},
+		{name: "Zero Value Receiver", options: []SelectorOption{WithID("selected")}, assertion: assertMatch},
+		{name: "Does Not Modify Receiver", selector: base, options: []SelectorOption{WithOwner("other")}, assertion: assertReceiverUnchanged},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			combined := tt.selector.And(tt.options...)
+			tt.assertion(t, combined)
 		})
 	}
 }
@@ -146,6 +192,87 @@ func Test_WithSource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matched := WithSource(tt.source)(tt.candidate)
+			tt.assertion(t, matched)
+		})
+	}
+}
+
+func Test_WithStatus(t *testing.T) {
+	// keys
+	active := New(KeyCandidate{Status: KeyStatusActive}, nil)
+	passive := New(KeyCandidate{Status: KeyStatusPassive}, nil)
+	disabled := New(KeyCandidate{Status: KeyStatusDisabled}, nil)
+
+	// assertions
+	assertMatch := func(t *testing.T, matched bool) {
+		if !matched {
+			t.Error("WithStatus() = false, want true")
+		}
+	}
+	assertNoMatch := func(t *testing.T, matched bool) {
+		if matched {
+			t.Error("WithStatus() = true, want false")
+		}
+	}
+	tests := []struct {
+		name      string
+		statuses  []KeyStatus
+		candidate Key
+		assertion func(*testing.T, bool)
+	}{
+		{name: "Single Matching Status", statuses: []KeyStatus{KeyStatusActive}, candidate: active, assertion: assertMatch},
+		{name: "One Of Multiple Statuses", statuses: []KeyStatus{KeyStatusActive, KeyStatusPassive}, candidate: passive, assertion: assertMatch},
+		{name: "Mismatched Status", statuses: []KeyStatus{KeyStatusActive, KeyStatusPassive}, candidate: disabled, assertion: assertNoMatch},
+		{name: "No Statuses", candidate: active, assertion: assertNoMatch},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matched := WithStatus(tt.statuses...)(tt.candidate)
+			tt.assertion(t, matched)
+		})
+	}
+}
+
+func Test_WithValidityAt(t *testing.T) {
+	// times
+	now := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+	// keys
+	unbounded := New(KeyCandidate{}, nil)
+	valid := New(KeyCandidate{NotBefore: past, NotAfter: future}, nil)
+	notYetValid := New(KeyCandidate{NotBefore: future}, nil)
+	expired := New(KeyCandidate{NotAfter: past}, nil)
+	validFromBoundary := New(KeyCandidate{NotBefore: now}, nil)
+	validThroughBoundary := New(KeyCandidate{NotAfter: now}, nil)
+
+	// assertions
+	assertMatch := func(t *testing.T, matched bool) {
+		if !matched {
+			t.Error("WithValidityAt() = false, want true")
+		}
+	}
+	assertNoMatch := func(t *testing.T, matched bool) {
+		if matched {
+			t.Error("WithValidityAt() = true, want false")
+		}
+	}
+	tests := []struct {
+		name      string
+		at        time.Time
+		candidate Key
+		assertion func(*testing.T, bool)
+	}{
+		{name: "Unbounded", at: now, candidate: unbounded, assertion: assertMatch},
+		{name: "Inside Range", at: now, candidate: valid, assertion: assertMatch},
+		{name: "Not Before Boundary", at: now, candidate: validFromBoundary, assertion: assertMatch},
+		{name: "Not After Boundary", at: now, candidate: validThroughBoundary, assertion: assertMatch},
+		{name: "Before Range", at: now, candidate: notYetValid, assertion: assertNoMatch},
+		{name: "After Range", at: now, candidate: expired, assertion: assertNoMatch},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matched := WithValidityAt(tt.at)(tt.candidate)
 			tt.assertion(t, matched)
 		})
 	}

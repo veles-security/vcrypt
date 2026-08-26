@@ -1,5 +1,7 @@
 package key
 
+import "time"
+
 // Selector identifies keys using a set of predicates. A zero-value selector
 // matches every key.
 type Selector struct {
@@ -11,13 +13,20 @@ type SelectorOption func(Key) bool
 
 // Select builds a selector that can be reused by key consumers.
 func Select(options ...SelectorOption) Selector {
-	selector := Selector{options: make([]SelectorOption, 0, len(options))}
+	return Selector{}.And(options...)
+}
+
+// And returns a selector containing the receiver's criteria followed by the
+// additional criteria. It does not modify the receiver.
+func (selector Selector) And(options ...SelectorOption) Selector {
+	combined := Selector{options: make([]SelectorOption, 0, len(selector.options)+len(options))}
+	combined.options = append(combined.options, selector.options...)
 	for _, option := range options {
 		if option != nil {
-			selector.options = append(selector.options, option)
+			combined.options = append(combined.options, option)
 		}
 	}
-	return selector
+	return combined
 }
 
 // WithID restricts selection to the key with id.
@@ -38,6 +47,29 @@ func WithOwner(owner string) SelectorOption {
 func WithSource(source string) SelectorOption {
 	return func(candidate Key) bool {
 		return candidate.Source() == source
+	}
+}
+
+// WithStatus restricts selection to keys with one of the supplied statuses.
+// It matches no keys when statuses is empty.
+func WithStatus(statuses ...KeyStatus) SelectorOption {
+	allowed := append([]KeyStatus(nil), statuses...)
+	return func(candidate Key) bool {
+		for _, status := range allowed {
+			if candidate.Status() == status {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// WithValidityAt restricts selection to keys valid at the supplied instant.
+// A zero key validity bound is treated as unspecified.
+func WithValidityAt(at time.Time) SelectorOption {
+	return func(candidate Key) bool {
+		return (candidate.NotBefore().IsZero() || !at.Before(candidate.NotBefore())) &&
+			(candidate.NotAfter().IsZero() || !at.After(candidate.NotAfter()))
 	}
 }
 

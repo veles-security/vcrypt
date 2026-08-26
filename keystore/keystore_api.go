@@ -174,10 +174,23 @@ func (k *store) selectKey(
 	})
 
 	now := time.Now()
+	statuses := []key.KeyStatus{key.KeyStatusActive, key.KeyStatusPassive}
+	if operation == key.KeyOpSign || operation == key.KeyOpEncrypt {
+		statuses = []key.KeyStatus{key.KeyStatusActive}
+	}
 	for _, algorithm := range algorithms {
+		eligible := selector.And(
+			key.WithStatus(statuses...),
+			key.WithValidityAt(now),
+			key.WithCapability(key.Capability{
+				Use:       useForOperation(operation),
+				Operation: operation,
+				Algorithm: algorithm,
+			}),
+		)
 		var matches []key.Key
 		for _, candidate := range candidates {
-			if k.eligible(candidate, operation, algorithm, now) {
+			if eligible.Matches(candidate) {
 				matches = append(matches, candidate)
 			}
 		}
@@ -191,40 +204,6 @@ func (k *store) selectKey(
 	}
 
 	return key.Key{}, "", fmt.Errorf("keystore: no eligible key supports operation %q and algorithms %v", operation, algorithms)
-}
-
-func (k *store) eligible(candidate key.Key, operation key.KeyOperation, algorithm key.KeyAlg, now time.Time) bool {
-	if candidate.Backend() == nil {
-		return false
-	}
-	if operation == key.KeyOpSign || operation == key.KeyOpEncrypt {
-		if candidate.Status() != key.KeyStatusActive {
-			return false
-		}
-	} else if candidate.Status() != key.KeyStatusActive && candidate.Status() != key.KeyStatusPassive {
-		return false
-	}
-	if !candidate.NotBefore().IsZero() && now.Before(candidate.NotBefore()) {
-		return false
-	}
-	if !candidate.NotAfter().IsZero() && now.After(candidate.NotAfter()) {
-		return false
-	}
-	use := useForOperation(operation)
-	if !candidate.Backend().Supports(use, operation, algorithm) {
-		return false
-	}
-
-	restrictions := candidate.Restrictions()
-	if len(restrictions) == 0 {
-		return true
-	}
-	for _, restriction := range restrictions {
-		if restriction.Use == use && restriction.Operation == operation && restriction.Algorithm == algorithm {
-			return true
-		}
-	}
-	return false
 }
 
 func useForOperation(operation key.KeyOperation) key.KeyUse {
