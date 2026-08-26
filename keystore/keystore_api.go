@@ -155,7 +155,7 @@ func (k *store) Decrypt(ctx context.Context, ciphertext []byte, options ...Decry
 func (k *store) selectKey(
 	ctx context.Context,
 	operation key.KeyOperation,
-	selector KeySelector,
+	selector key.Selector,
 	algorithms []key.KeyAlg,
 ) (key.Key, key.KeyAlg, error) {
 	if k == nil {

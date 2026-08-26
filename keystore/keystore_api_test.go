@@ -30,7 +30,7 @@ func encryptionStore(t *testing.T, keys ...key.Key) Keystore {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Replace(context.Background(), keys, WithKeySelector()); err != nil {
+	if err := store.Replace(context.Background(), keys, key.Select()); err != nil {
 		t.Fatal(err)
 	}
 	return store
@@ -151,7 +151,7 @@ func Test_store_Decrypt(t *testing.T) {
 			got, gotErr := store.Decrypt(
 				context.Background(),
 				tt.ciphertext,
-				WithKeys(WithKeySelector(WithKeyID(tt.keyID))),
+				WithKeys(key.Select(key.WithID(tt.keyID))),
 				WithAlgorithms(tt.algorithms...),
 			)
 			tt.assertion(t, got, gotErr)

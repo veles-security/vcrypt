@@ -3,7 +3,7 @@ package keystore
 import "github.com/veles-security/vcrypt/key"
 
 type operationQuery struct {
-	Keys       KeySelector
+	Keys       key.Selector
 	Algorithms []key.KeyAlg
 }
 
@@ -22,7 +22,7 @@ type EncryptOption = KeystoreRuntimeOption
 type DecryptOption = KeystoreRuntimeOption
 
 // WithKeys restricts an operation to keys matching selector.
-func WithKeys(selector KeySelector) KeystoreRuntimeOption {
+func WithKeys(selector key.Selector) KeystoreRuntimeOption {
 	return func(options *operationQuery) {
 		options.Keys = selector
 	}

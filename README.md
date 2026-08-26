@@ -50,7 +50,7 @@ func signPayload(ctx context.Context, keys keystore.Keystore, payload []byte) (k
 	return keys.Sign(
 		ctx,
 		payload,
-		keystore.WithKeys(keystore.Select(keystore.WithKeySource("token-signing"))),
+		keystore.WithKeys(key.Select(key.WithSource("token-signing"))),
 		keystore.WithAlgorithms(key.KeyAlg("PS256")),
 	)
 }
@@ -65,9 +65,9 @@ func verifyPartnerPayload(
 		ctx,
 		payload,
 		signature,
-		keystore.WithKeys(keystore.Select(
-			keystore.WithKeySource("partner"),
-			keystore.WithKeyID(keyID),
+		keystore.WithKeys(key.Select(
+			key.WithSource("partner"),
+			key.WithID(keyID),
 		)),
 		keystore.WithAlgorithms(key.KeyAlg("PS256")),
 	)
@@ -94,9 +94,9 @@ err = keys.VerifySignature(
 	ctx,
 	signedContent,
 	signature,
-	keystore.WithKeys(keystore.Select(
-		keystore.WithKeySource("issuer"),
-		keystore.WithKeyID(keyID), // the token header's kid
+	keystore.WithKeys(key.Select(
+		key.WithSource("issuer"),
+		key.WithID(keyID), // the token header's kid
 	)),
 	keystore.WithAlgorithms(key.KeyAlg("RS256")),
 )
@@ -130,8 +130,8 @@ defer keys.Close()
 result, err := keys.Sign(
 	ctx,
 	claims,
-	keystore.WithKeys(keystore.Select(
-		keystore.WithKeySource("authorization-server"),
+	keystore.WithKeys(key.Select(
+		key.WithSource("authorization-server"),
 	)),
 	keystore.WithAlgorithms(key.KeyAlg("PS256")),
 )

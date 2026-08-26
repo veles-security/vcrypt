@@ -50,11 +50,11 @@ func (m *store) Close() error {
 	return result
 }
 
-func (m *store) Find(ctx context.Context, selector KeySelector) ([]key.Key, error) {
+func (m *store) Find(ctx context.Context, selector key.Selector) ([]key.Key, error) {
 	return m.repository.Find(ctx, selector)
 }
 
-func (m *store) Replace(ctx context.Context, keys []key.Key, selector KeySelector) error {
+func (m *store) Replace(ctx context.Context, keys []key.Key, selector key.Selector) error {
 	return m.repository.Replace(ctx, keys, selector)
 }
 
@@ -91,7 +91,7 @@ func (m *store) Bind(source keysource.Source) error {
 		}
 	}
 	if err == nil {
-		err = m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(id)))
+		err = m.repository.Replace(context.Background(), keys, key.Select(key.WithSource(id)))
 		if err != nil {
 			err = fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 		}
@@ -132,7 +132,7 @@ func (m *store) bindSelfRefreshing(source keysource.Source) {
 			if err != nil {
 				return fmt.Errorf("failed to build keys from source %s: %w", id, err)
 			}
-			if err := m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(id))); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, key.Select(key.WithSource(id))); err != nil {
 				return fmt.Errorf("failed to store keys from source %s in keystore: %w", id, err)
 			}
 			return nil
@@ -157,7 +157,7 @@ func (m *store) loadSources(sources []keysource.Source) error {
 				errs <- fmt.Errorf("failed to build keys from source %s: %w", source.ID(), err)
 				return
 			}
-			if err := m.repository.Replace(context.Background(), keys, WithKeySelector(WithKeySource(source.ID()))); err != nil {
+			if err := m.repository.Replace(context.Background(), keys, key.Select(key.WithSource(source.ID()))); err != nil {
 				errs <- fmt.Errorf("failed to store keys from source %s in keystore: %w", source.ID(), err)
 			}
 		}()
