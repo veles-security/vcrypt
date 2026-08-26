@@ -15,7 +15,38 @@ import (
 	"github.com/veles-security/vcrypt/material"
 )
 
+type reentrantMaterial struct{}
+
+func (*reentrantMaterial) IsMaterial() bool                 { return true }
+func (*reentrantMaterial) Public() *material.PublicMaterial { return nil }
+
+type reentrantFactory struct{}
+
+func (*reentrantFactory) Supports(value material.Material) bool {
+	if _, ok := value.(*reentrantMaterial); !ok {
+		return false
+	}
+	backend.Regsiter(unsupportedFactory{})
+	return true
+}
+
+func (*reentrantFactory) New(material.Material) (key.Backend, error) {
+	backend.Regsiter(unsupportedFactory{})
+	return testBackend{}, nil
+}
+
+type unsupportedFactory struct{}
+
+func (unsupportedFactory) Supports(material.Material) bool            { return false }
+func (unsupportedFactory) New(material.Material) (key.Backend, error) { return nil, nil }
+
+type testBackend struct{}
+
+func (testBackend) Supports(key.KeyUse, key.KeyOperation, key.KeyAlg) bool { return false }
+func (testBackend) Capabilities() []key.Capability                         { return nil }
+
 func Test_BackendFor(t *testing.T) {
+	backend.Regsiter(&reentrantFactory{})
 	var privateMaterial *material.PrivateMaterial
 	var publicMaterial *material.PublicMaterial
 	var certificateMaterial *material.CertificateMaterial
@@ -41,6 +72,7 @@ func Test_BackendFor(t *testing.T) {
 		assertion func(*testing.T, key.Backend, error)
 	}{
 		{name: "Symmetric Material", material: &material.SymmetricMaterial{Key: make([]byte, 32)}, assertion: assertBackend},
+		{name: "Factory Reenters Registry", material: &reentrantMaterial{}, assertion: assertBackend},
 		{name: "Nil Interface", assertion: assertNilMaterial},
 		{name: "Typed Nil Private Material", material: privateMaterial, assertion: assertNilMaterial},
 		{name: "Typed Nil Public Material", material: publicMaterial, assertion: assertNilMaterial},

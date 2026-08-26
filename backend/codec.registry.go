@@ -35,10 +35,11 @@ func JOSEEncoderFor(value material.Material) (key.JOSEEncoder, error) {
 		return nil, errors.New("nil material")
 	}
 	codecs.RLock()
-	defer codecs.RUnlock()
-	for i := len(codecs.joseEncoders) - 1; i >= 0; i-- {
-		if codecs.joseEncoders[i].SupportsMaterial(value) {
-			return codecs.joseEncoders[i], nil
+	encoders := append([]key.JOSEEncoder(nil), codecs.joseEncoders...)
+	codecs.RUnlock()
+	for i := len(encoders) - 1; i >= 0; i-- {
+		if encoders[i].SupportsMaterial(value) {
+			return encoders[i], nil
 		}
 	}
 	return nil, errors.New("JOSE encoder: material is not supported")
@@ -59,10 +60,11 @@ func RegisterJOSEDecoder(decoder key.JOSEDecoder) {
 // the supplied JOSE kty value.
 func JOSEDecoderFor(kty string) (key.JOSEDecoder, error) {
 	codecs.RLock()
-	defer codecs.RUnlock()
-	for i := len(codecs.joseDecoders) - 1; i >= 0; i-- {
-		if codecs.joseDecoders[i].SupportsJOSEKeyType(kty) {
-			return codecs.joseDecoders[i], nil
+	decoders := append([]key.JOSEDecoder(nil), codecs.joseDecoders...)
+	codecs.RUnlock()
+	for i := len(decoders) - 1; i >= 0; i-- {
+		if decoders[i].SupportsJOSEKeyType(kty) {
+			return decoders[i], nil
 		}
 	}
 	return nil, errors.New("JOSE decoder: key type is not supported")
@@ -86,10 +88,11 @@ func SAMLEncoderFor(value material.Material) (key.SAMLEncoder, error) {
 		return nil, errors.New("nil material")
 	}
 	codecs.RLock()
-	defer codecs.RUnlock()
-	for i := len(codecs.samlEncoders) - 1; i >= 0; i-- {
-		if codecs.samlEncoders[i].SupportsMaterial(value) {
-			return codecs.samlEncoders[i], nil
+	encoders := append([]key.SAMLEncoder(nil), codecs.samlEncoders...)
+	codecs.RUnlock()
+	for i := len(encoders) - 1; i >= 0; i-- {
+		if encoders[i].SupportsMaterial(value) {
+			return encoders[i], nil
 		}
 	}
 	return nil, errors.New("SAML encoder: material is not supported")
@@ -110,10 +113,11 @@ func RegisterSAMLDecoder(decoder key.SAMLDecoder) {
 // the supplied XML element name.
 func SAMLDecoderFor(name xml.Name) (key.SAMLDecoder, error) {
 	codecs.RLock()
-	defer codecs.RUnlock()
-	for i := len(codecs.samlDecoders) - 1; i >= 0; i-- {
-		if codecs.samlDecoders[i].SupportsSAMLKeyType(name) {
-			return codecs.samlDecoders[i], nil
+	decoders := append([]key.SAMLDecoder(nil), codecs.samlDecoders...)
+	codecs.RUnlock()
+	for i := len(decoders) - 1; i >= 0; i-- {
+		if decoders[i].SupportsSAMLKeyType(name) {
+			return decoders[i], nil
 		}
 	}
 	return nil, errors.New("SAML decoder: key type is not supported")

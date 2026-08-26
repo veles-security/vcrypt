@@ -30,10 +30,11 @@ func BackendFor(material material.Material) (key.Backend, error) {
 		return nil, errors.New("nil material")
 	}
 	registry.RLock()
-	defer registry.RUnlock()
+	factories := append([]Factory(nil), registry.factories...)
+	registry.RUnlock()
 
-	for i := len(registry.factories) - 1; i >= 0; i-- {
-		backendFactory := registry.factories[i]
+	for i := len(factories) - 1; i >= 0; i-- {
+		backendFactory := factories[i]
 		if backendFactory.Supports(material) {
 			return backendFactory.New(material)
 		}
