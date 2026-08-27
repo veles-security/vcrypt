@@ -2,6 +2,7 @@ package jwks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -22,16 +23,38 @@ type WriteFunc func(ctx context.Context, carrierWriter http.ResponseWriter, arti
 type WriterOption func(next WriteFunc) WriteFunc
 
 // NewWriter returns a JSON Web Key Set HTTP response writer.
-func NewWriter(options ...WriterConfigOption) vapi.Writer[http.ResponseWriter, *JWKS[key.Key], WriterOption] {
-	return &Writer{
-		encoder: &Encoder{},
+func NewWriter(configOptions ...WriterConfigOption) (vapi.Writer[http.ResponseWriter, *JWKS[key.Key], WriterOption], error) {
+	writer := &Writer{}
+	for _, option := range configOptions {
+		if option == nil {
+			return nil, vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil encoder config option"))
+		}
+		if err := option(writer); err != nil {
+			return nil, vapi.NewErrorCategory(vapi.ErrMisconfigured, err)
+		}
 	}
+
+	if writer.encoder == nil {
+		encoder, err := NewEncoder()
+		if err != nil {
+			return nil, err
+		}
+		writer.encoder = encoder
+	}
+
+	return writer, nil
 }
 
 // WriteArtifact implements [vapi.Writer].
 func (w *Writer) WriteArtifact(ctx context.Context, carrierWriter http.ResponseWriter, artifact *JWKS[key.Key], options ...WriterOption) error {
-	if w.encoder == nil {
+	if w == nil || w.encoder == nil {
 		return vapi.NewErrorCategory(vapi.ErrMisconfigured, fmt.Errorf("cannot write JWKS response with nil JWKS encoder"))
+	}
+	if carrierWriter == nil {
+		return vapi.NewErrorCategory(vapi.ErrMalformed, fmt.Errorf("cannot write JWKS response to nil HTTP response writer"))
+	}
+	if artifact == nil {
+		return vapi.NewErrorCategory(vapi.ErrMalformed, fmt.Errorf("cannot write nil JWKS response"))
 	}
 	if artifact.Keys == nil {
 		return vapi.NewErrorCategory(vapi.ErrMalformed, fmt.Errorf("cannot write JWKS response with nil Keys"))
