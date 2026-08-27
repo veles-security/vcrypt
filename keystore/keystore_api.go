@@ -51,9 +51,9 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 	}, nil
 }
 
-// VerifySignature selects a key and verifies signature. Active and passive
+// Verify selects a key and verifies signature. Active and passive
 // keys are eligible for verification.
-func (k *store) VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
+func (k *store) Verify(ctx context.Context, message, signature []byte, options ...VerifyOption) error {
 	var request operationQuery
 	for _, option := range k.runtimeOptions {
 		option(&request)
@@ -76,11 +76,11 @@ func (k *store) VerifySignature(ctx context.Context, message, signature []byte, 
 		return err
 	}
 
-	verifier, ok := selected.Backend().(key.SignatureVerifier)
+	verifier, ok := selected.Backend().(key.Verifier)
 	if !ok {
 		return fmt.Errorf("keystore: backend for key %q does not implement signature verification", selected.ID())
 	}
-	if err := verifier.VerifySignature(ctx, algorithm, signature, message); err != nil {
+	if err := verifier.Verify(ctx, algorithm, signature, message); err != nil {
 		return fmt.Errorf("keystore: verify with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
 	}
 	return nil

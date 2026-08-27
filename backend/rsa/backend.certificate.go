@@ -13,5 +13,5 @@ type certificateBackend struct {
 }
 
 var _ key.Backend = &certificateBackend{}
-var _ key.SignatureVerifier = &certificateBackend{}
+var _ key.Verifier = &certificateBackend{}
 var _ key.Encrypter = &certificateBackend{}

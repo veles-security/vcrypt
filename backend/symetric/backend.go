@@ -93,8 +93,8 @@ func (b *symmetricBackend) Supports(use key.KeyUse, operation key.KeyOperation, 
 	return false
 }
 
-// VerifySignature implements [key.SignatureVerifier].
-func (b *symmetricBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
+// Verify implements [key.Verifier].
+func (b *symmetricBackend) Verify(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -154,6 +154,6 @@ func (b *symmetricBackend) Decrypt(ctx context.Context, algorithm key.KeyAlg, ci
 
 var _ key.Backend = &symmetricBackend{}
 var _ key.Signer = &symmetricBackend{}
-var _ key.SignatureVerifier = &symmetricBackend{}
+var _ key.Verifier = &symmetricBackend{}
 var _ key.Encrypter = &symmetricBackend{}
 var _ key.Decrypter = &symmetricBackend{}

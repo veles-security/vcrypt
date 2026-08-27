@@ -13,8 +13,8 @@ type Signer interface {
 	Sign(ctx context.Context, algorithm KeyAlg, message []byte) ([]byte, error)
 }
 
-type SignatureVerifier interface {
-	VerifySignature(ctx context.Context, algorithm KeyAlg, signature []byte, message []byte) error
+type Verifier interface {
+	Verify(ctx context.Context, algorithm KeyAlg, signature []byte, message []byte) error
 }
 
 type Encrypter interface {

@@ -92,7 +92,7 @@ func Test_privateBackend_VerifySignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.assertion(t, backend.VerifySignature(context.Background(), ES256, tt.signature, message))
+			tt.assertion(t, backend.Verify(context.Background(), ES256, tt.signature, message))
 		})
 	}
 }

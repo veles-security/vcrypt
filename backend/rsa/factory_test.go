@@ -55,7 +55,7 @@ func Test_factory_New(t *testing.T) {
 		if certificateBackend.material.Cert.PublicKey.(*stdrsa.PublicKey).N.Cmp(publicKey.N) != 0 {
 			t.Errorf("New() copied a different certificate public key")
 		}
-		if _, ok := backend.(key.SignatureVerifier); !ok {
+		if _, ok := backend.(key.Verifier); !ok {
 			t.Errorf("certificate backend does not implement key.SignatureVerifier")
 		}
 		if _, ok := backend.(key.Encrypter); !ok {

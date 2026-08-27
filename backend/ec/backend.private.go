@@ -54,8 +54,8 @@ func (b *privateBackend) Supports(use key.KeyUse, operation key.KeyOperation, al
 	return false
 }
 
-// VerifySignature implements [key.SignatureVerifier].
-func (b *privateBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
+// Verify implements [key.Verifier].
+func (b *privateBackend) Verify(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -105,4 +105,4 @@ func verifySignature(publicKey *ecdsa.PublicKey, digest, signature []byte) bool 
 
 var _ key.Backend = &privateBackend{}
 var _ key.Signer = &privateBackend{}
-var _ key.SignatureVerifier = &privateBackend{}
+var _ key.Verifier = &privateBackend{}

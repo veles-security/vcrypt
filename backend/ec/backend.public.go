@@ -28,8 +28,8 @@ func (b *publicBackend) Supports(use key.KeyUse, operation key.KeyOperation, alg
 	return false
 }
 
-// VerifySignature implements [key.SignatureVerifier].
-func (b *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
+// Verify implements [key.Verifier].
+func (b *publicBackend) Verify(ctx context.Context, algorithm key.KeyAlg, signature []byte, message []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -52,4 +52,4 @@ func (b *publicBackend) VerifySignature(ctx context.Context, algorithm key.KeyAl
 }
 
 var _ key.Backend = &publicBackend{}
-var _ key.SignatureVerifier = &publicBackend{}
+var _ key.Verifier = &publicBackend{}

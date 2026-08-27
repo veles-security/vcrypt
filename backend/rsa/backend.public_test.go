@@ -87,7 +87,7 @@ func Test_publicBackend_VerifySignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.backend.VerifySignature(context.Background(), tt.algorithm, tt.signature, tt.message)
+			err := tt.backend.Verify(context.Background(), tt.algorithm, tt.signature, tt.message)
 			tt.assertion(t, err)
 		})
 	}
