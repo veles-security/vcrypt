@@ -3,12 +3,13 @@ package keystore
 import (
 	"errors"
 
+	"github.com/veles-security/vcrypt/keyset"
 	"github.com/veles-security/vcrypt/keysource"
 )
 
 func New(options ...Option) (Keystore, error) {
 	m := &store{
-		repository:     NewRepository(),
+		repository:     keyset.New(),
 		sources:        map[string]keysource.Source{},
 		loading:        map[string]keysource.Source{},
 		runtimeOptions: []KeystoreRuntimeOption{},

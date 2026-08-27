@@ -1,4 +1,4 @@
-package keystore
+package keyset
 
 import (
 	"context"
@@ -7,24 +7,24 @@ import (
 	"github.com/veles-security/vcrypt/key"
 )
 
-type Repository interface {
+type KeySet interface {
 	Find(ctx context.Context, selector key.Selector) ([]key.Key, error)
 	Replace(ctx context.Context, keys []key.Key, selector key.Selector) error
 }
 
-type repository struct {
+type keySet struct {
 	mu   sync.RWMutex
 	keys []key.Key
 }
 
-func NewRepository() Repository {
-	return &repository{
+func New() KeySet {
+	return &keySet{
 		keys: []key.Key(nil),
 	}
 }
 
-// Find implements [Repository].
-func (r *repository) Find(ctx context.Context, selector key.Selector) ([]key.Key, error) {
+// Find implements [KeySet].
+func (r *keySet) Find(ctx context.Context, selector key.Selector) ([]key.Key, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -42,8 +42,8 @@ func (r *repository) Find(ctx context.Context, selector key.Selector) ([]key.Key
 	return result, nil
 }
 
-// Replace implements [Repository].
-func (r *repository) Replace(ctx context.Context, keys []key.Key, selector key.Selector) error {
+// Replace implements [KeySet].
+func (r *keySet) Replace(ctx context.Context, keys []key.Key, selector key.Selector) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -63,4 +63,4 @@ func (r *repository) Replace(ctx context.Context, keys []key.Key, selector key.S
 	return nil
 }
 
-var _ Repository = &repository{}
+var _ KeySet = &keySet{}

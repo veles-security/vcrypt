@@ -8,26 +8,24 @@ import (
 	"sync"
 
 	"github.com/veles-security/vcrypt/backend"
-	_ "github.com/veles-security/vcrypt/backend/ec"
-	_ "github.com/veles-security/vcrypt/backend/rsa"
-	_ "github.com/veles-security/vcrypt/backend/symetric"
 	"github.com/veles-security/vcrypt/key"
+	"github.com/veles-security/vcrypt/keyset"
 	"github.com/veles-security/vcrypt/keysource"
 )
 
 type Keystore interface {
-	Repository
-	Close() error
+	Keys(ctx context.Context, selector key.Selector) ([]key.Key, error)
 	Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error)
 	VerifySignature(ctx context.Context, message, signature []byte, options ...VerifyOption) error
 	Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error)
 	Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error)
 	Bind(source keysource.Source) error
 	RefreshAll() error
+	Close() error
 }
 
 type store struct {
-	repository     Repository
+	repository     keyset.KeySet
 	sources        map[string]keysource.Source
 	loading        map[string]keysource.Source
 	sourcesMU      sync.RWMutex
@@ -77,12 +75,8 @@ func (m *store) Close() error {
 	return m.closeErr
 }
 
-func (m *store) Find(ctx context.Context, selector key.Selector) ([]key.Key, error) {
+func (m *store) Keys(ctx context.Context, selector key.Selector) ([]key.Key, error) {
 	return m.repository.Find(ctx, selector)
-}
-
-func (m *store) Replace(ctx context.Context, keys []key.Key, selector key.Selector) error {
-	return m.repository.Replace(ctx, keys, selector)
 }
 
 // Bind implements [Manager].

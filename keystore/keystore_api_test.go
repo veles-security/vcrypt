@@ -8,29 +8,36 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/veles-security/vcrypt/backend"
 	"github.com/veles-security/vcrypt/backend/symetric"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/material"
 )
 
-func encryptionKey(t *testing.T, id string, status key.KeyStatus, secret []byte) key.Key {
-	t.Helper()
-	keyMaterial := &material.SymmetricMaterial{Key: secret}
-	keyBackend, err := backend.BackendFor(keyMaterial)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return key.New(key.KeyCandidate{ID: id, Status: status, Material: keyMaterial}, keyBackend)
+type encryptionSource struct {
+	keys []key.KeyCandidate
 }
 
-func encryptionStore(t *testing.T, keys ...key.Key) Keystore {
-	t.Helper()
-	store, err := New()
-	if err != nil {
-		t.Fatal(err)
+func (s *encryptionSource) ID() string { return "encryption-test" }
+
+func (s *encryptionSource) Load(context.Context) ([]key.KeyCandidate, error) {
+	return s.keys, nil
+}
+
+func (s *encryptionSource) Close() error { return nil }
+
+func encryptionKey(id string, status key.KeyStatus, secret []byte) key.KeyCandidate {
+	return key.KeyCandidate{
+		ID:       id,
+		Source:   "encryption-test",
+		Status:   status,
+		Material: &material.SymmetricMaterial{Key: secret},
 	}
-	if err := store.Replace(context.Background(), keys, key.Select()); err != nil {
+}
+
+func encryptionStore(t *testing.T, keys ...key.KeyCandidate) Keystore {
+	t.Helper()
+	store, err := New(WithSource(&encryptionSource{keys: keys}, nil))
+	if err != nil {
 		t.Fatal(err)
 	}
 	return store
@@ -52,9 +59,9 @@ func aesGCM(t *testing.T, secret []byte) cipher.AEAD {
 func Test_store_Encrypt(t *testing.T) {
 	secret := bytes.Repeat([]byte{0x42}, 32)
 	plaintext := []byte("confidential message")
-	activeStore := encryptionStore(t, encryptionKey(t, "active", key.KeyStatusActive, secret))
-	unsetStatusStore := encryptionStore(t, encryptionKey(t, "active", "", secret))
-	passiveStore := encryptionStore(t, encryptionKey(t, "passive", key.KeyStatusPassive, secret))
+	activeStore := encryptionStore(t, encryptionKey("active", key.KeyStatusActive, secret))
+	unsetStatusStore := encryptionStore(t, encryptionKey("active", "", secret))
+	passiveStore := encryptionStore(t, encryptionKey("passive", key.KeyStatusPassive, secret))
 	canceledContext, cancel := context.WithCancel(context.Background())
 	cancel()
 	assertEncrypted := func(t *testing.T, result EncryptResult, err error) {
@@ -113,9 +120,9 @@ func Test_store_Decrypt(t *testing.T) {
 	nonce := bytes.Repeat([]byte{0x01}, gcm.NonceSize())
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
 	store := encryptionStore(t,
-		encryptionKey(t, "active", key.KeyStatusActive, secret),
-		encryptionKey(t, "passive", key.KeyStatusPassive, secret),
-		encryptionKey(t, "disabled", key.KeyStatusDisabled, secret),
+		encryptionKey("active", key.KeyStatusActive, secret),
+		encryptionKey("passive", key.KeyStatusPassive, secret),
+		encryptionKey("disabled", key.KeyStatusDisabled, secret),
 	)
 	assertPlaintext := func(t *testing.T, got []byte, err error) {
 		if err != nil {
