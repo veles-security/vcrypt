@@ -174,12 +174,16 @@ func (k *store) selectKey(
 	})
 
 	now := time.Now()
+	use := key.KeyUseSigning
+	if operation == key.KeyOpEncrypt || operation == key.KeyOpDecrypt {
+		use = key.KeyUseEncryption
+	}
 	for _, algorithm := range algorithms {
 		eligible := selector.And(
 			key.WithoutStatus(key.KeyStatusDisabled),
 			key.WithValidityAt(now),
 			key.WithCapability(key.Capability{
-				Use:       useForOperation(operation),
+				Use:       use,
 				Operation: operation,
 				Algorithm: algorithm,
 			}),
@@ -203,11 +207,4 @@ func (k *store) selectKey(
 	}
 
 	return key.Key{}, "", fmt.Errorf("keystore: no eligible key supports operation %q and algorithms %v", operation, algorithms)
-}
-
-func useForOperation(operation key.KeyOperation) key.KeyUse {
-	if operation == key.KeyOpEncrypt || operation == key.KeyOpDecrypt {
-		return key.KeyUseEncryption
-	}
-	return key.KeyUseSigning
 }
