@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/veles-security/vcrypt/descriptor"
+	"github.com/veles-security/vcrypt/jwks"
 )
 
 const defaultHTTPTimeout = 30 * time.Second
@@ -56,13 +56,17 @@ func New(id, rawURL string, frequency time.Duration, options ...Option) (*Source
 	}
 
 	lifecycleContext, cancel := context.WithCancel(context.Background())
+	decoder, err := jwks.NewDecoder()
+	if err != nil {
+		return nil, fmt.Errorf("JWKS source: decoder init failed: %w", err)
+	}
 	source := &Source{
 		id:         id,
 		url:        parsedURL.String(),
 		frequency:  frequency,
 		client:     &http.Client{Timeout: defaultHTTPTimeout},
 		ownsClient: true,
-		decoder:    descriptor.NewJWKSDecoder(),
+		decoder:    decoder,
 		ctx:        lifecycleContext,
 		cancel:     cancel,
 	}

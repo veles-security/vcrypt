@@ -23,7 +23,7 @@ func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) 
 	return f(request)
 }
 
-func jwks(id string) string {
+func jwksPayload(id string) string {
 	return fmt.Sprintf(`{"keys":[%s]}`, fmt.Sprintf(rsaJWK, id))
 }
 
@@ -73,9 +73,9 @@ func Test_Source_Load(t *testing.T) {
 		redirect  string
 		assertion func(*testing.T, []key.KeyCandidate, error)
 	}{
-		{name: "JWKS", status: http.StatusOK, body: jwks("key-1"), assertion: assertKeys},
-		{name: "HTTPS Redirect", status: http.StatusOK, body: jwks("key-1"), redirect: "https://keys.example/jwks", assertion: assertKeys},
-		{name: "HTTP Redirect Rejected", status: http.StatusOK, body: jwks("key-1"), redirect: "http://keys.example/jwks", assertion: assertErrorContaining("insecure URL")},
+		{name: "JWKS", status: http.StatusOK, body: jwksPayload("key-1"), assertion: assertKeys},
+		{name: "HTTPS Redirect", status: http.StatusOK, body: jwksPayload("key-1"), redirect: "https://keys.example/jwks", assertion: assertKeys},
+		{name: "HTTP Redirect Rejected", status: http.StatusOK, body: jwksPayload("key-1"), redirect: "http://keys.example/jwks", assertion: assertErrorContaining("insecure URL")},
 		{name: "HTTP Error", status: http.StatusServiceUnavailable, body: "unavailable", assertion: assertErrorContaining("503")},
 		{name: "Malformed JWKS", status: http.StatusOK, body: `{"keys":[`, assertion: assertErrorContaining("decode JWKS")},
 	}
@@ -264,7 +264,7 @@ func Test_Source_Close(t *testing.T) {
 
 func Test_Source_SetRefreshCallback(t *testing.T) {
 	var mu sync.RWMutex
-	body := jwks("key-1")
+	body := jwksPayload("key-1")
 	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		mu.RLock()
 		defer mu.RUnlock()
@@ -291,7 +291,7 @@ func Test_Source_SetRefreshCallback(t *testing.T) {
 		return nil
 	})
 	mu.Lock()
-	body = jwks("key-2")
+	body = jwksPayload("key-2")
 	mu.Unlock()
 
 	tests := []struct {

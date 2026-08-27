@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/veles-security/vapi"
-	"github.com/veles-security/vcrypt/descriptor"
+	"github.com/veles-security/vcrypt/jwks"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keysource"
 )
@@ -30,7 +30,7 @@ type Source struct {
 	frequency  time.Duration
 	client     *http.Client
 	ownsClient bool
-	decoder    vapi.Decoder[descriptor.JWKS[key.KeyCandidate], key.JOSEDecodeOption]
+	decoder    vapi.Decoder[jwks.JWKS[key.KeyCandidate], jwks.DecoderOption]
 	allowHTTP  bool
 	ctx        context.Context
 	cancel     context.CancelFunc
