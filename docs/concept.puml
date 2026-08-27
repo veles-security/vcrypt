@@ -7,50 +7,109 @@ skinparam linetype ortho
 hide empty members
 
 package vapi {
-    interface "Encoder<A, O>" as VapiEncoder
-    interface "Decoder<A, O>" as VapiDecoder
-    interface Artifact
+    interface Encoder[A,O] {
+        + Encode(ctx, artifact A, options ...O) ([]byte, error)
+    }
+    interface Decoder[A,O] {
+        + Decode(ctx, encoded []byte, options ...O) (A, error)
+    }
+    interface Artifact {
+        + Kind() string
+    }
 }
 
 package key {
     class KeyCandidate {
         + ID string
+        + Owner string
         + Source string
+        + Restrictions []Capability
         + Status KeyStatus
+        + Priority int
+        + NotBefore time.Time
+        + NotAfter time.Time
         + Material Material
+        + Kind() string
     }
-
     class Key {
         + ID() string
+        + Owner() string
+        + Source() string
+        + Restrictions() []Capability
+        + Status() KeyStatus
+        + Priority() int
+        + NotBefore() time.Time
+        + NotAfter() time.Time
         + Material() Material
         + Backend() Backend
+        + Descriptor(algorithm) KeyDescriptor
+        + Kind() string
     }
-
+    class KeyDescriptor {
+        + ID string
+        + Owner string
+        + Source string
+        + Algorithm KeyAlg
+        + Restrictions []Capability
+        + Status KeyStatus
+        + Priority int
+        + NotBefore time.Time
+        + NotAfter time.Time
+        + Material *PublicMaterial
+    }
+    class Capability {
+        + Use KeyUse
+        + Operation KeyOperation
+        + Algorithm KeyAlg
+    }
     interface Backend {
         + Supports(use, operation, algorithm) bool
         + Capabilities() []Capability
     }
-
+    interface Signer {
+        + Sign(ctx, algorithm, message) ([]byte, error)
+    }
+    interface SignatureVerifier {
+        + VerifySignature(ctx, algorithm, signature, message) error
+    }
+    interface Encrypter {
+        + Encrypt(ctx, algorithm, plaintext) ([]byte, error)
+    }
+    interface Decrypter {
+        + Decrypt(ctx, algorithm, ciphertext) ([]byte, error)
+    }
     interface JOSEEncoder {
-        + Encode(ctx, Key, options) []byte
+        + Encode(ctx, Key, options ...JOSEEncodeOption) ([]byte, error)
         + SupportsMaterial(Material) bool
     }
-
     interface JOSEDecoder {
-        + Decode(ctx, encoded, options) KeyCandidate
+        + Decode(ctx, encoded, options ...JOSEDecodeOption) (KeyCandidate, error)
         + SupportsJOSEKeyType(kty) bool
     }
-
+    interface SAMLEncoder {
+        + Encode(ctx, Key, options ...SAMLEncodeOption) ([]byte, error)
+        + SupportsMaterial(Material) bool
+    }
+    interface SAMLDecoder {
+        + Decode(ctx, encoded, options ...SAMLDecodeOption) (KeyCandidate, error)
+        + SupportsSAMLKeyType(name) bool
+    }
     Key *-- Backend
+    Key --> KeyDescriptor : creates
+    KeyCandidate o-- "*" Capability : restrictions
+    Key o-- "*" Capability : restrictions
+    Backend --> "*" Capability : reports
 }
 
 package material {
-    interface Material
+    interface Material {
+        + IsMaterial() bool
+        + Public() *PublicMaterial
+    }
     class PublicMaterial
     class PrivateMaterial
     class CertificateMaterial
     class SymmetricMaterial
-
     Material <|.. PublicMaterial
     Material <|.. PrivateMaterial
     Material <|.. CertificateMaterial
@@ -59,25 +118,25 @@ package material {
 
 KeyCandidate --> Material
 Key --> Material
+KeyDescriptor --> PublicMaterial
 Artifact <|.. KeyCandidate
 Artifact <|.. Key
 VapiEncoder <|-- JOSEEncoder
 VapiDecoder <|-- JOSEDecoder
+VapiEncoder <|-- SAMLEncoder
+VapiDecoder <|-- SAMLDecoder
 
 package descriptor {
     class "JWKS<A>" as JWKS {
         + Keys []A
         + Kind() string
     }
-
     class JWKSEncoder {
-        + Encode(ctx, JWKS<Key>, options) []byte
+        + Encode(ctx, JWKS[Key], options ...JOSEEncodeOption) ([]byte, error)
     }
-
     class JWKSDecoder {
-        + Decode(ctx, encoded, options) JWKS<KeyCandidate>
+        + Decode(ctx, encoded, options ...JOSEDecodeOption) (JWKS<KeyCandidate>, error)
     }
-
     Artifact <|.. JWKS
     VapiEncoder <|.. JWKSEncoder
     VapiDecoder <|.. JWKSDecoder
@@ -88,24 +147,27 @@ package descriptor {
 package backend {
     interface Factory {
         + Supports(Material) bool
-        + New(Material) Backend
+        + New(Material) (Backend, error)
     }
-
     class "Backend registry" as BackendRegistry {
         + Regsiter(Factory)
-        + BackendFor(Material) Backend
+        + BackendFor(Material) (Backend, error)
     }
-
     class "Codec registry" as CodecRegistry {
         + RegisterJOSEEncoder(JOSEEncoder)
         + RegisterJOSEDecoder(JOSEDecoder)
-        + JOSEEncoderFor(Material) JOSEEncoder
-        + JOSEDecoderFor(kty) JOSEDecoder
+        + JOSEEncoderFor(Material) (JOSEEncoder, error)
+        + JOSEDecoderFor(kty) (JOSEDecoder, error)
+        + RegisterSAMLEncoder(SAMLEncoder)
+        + RegisterSAMLDecoder(SAMLDecoder)
+        + SAMLEncoderFor(Material) (SAMLEncoder, error)
+        + SAMLDecoderFor(name) (SAMLDecoder, error)
     }
-
     BackendRegistry o-- Factory
     CodecRegistry o-- JOSEEncoder
     CodecRegistry o-- JOSEDecoder
+    CodecRegistry o-- SAMLEncoder
+    CodecRegistry o-- SAMLDecoder
 }
 
 JWKSEncoder --> CodecRegistry : selects by material
@@ -123,23 +185,35 @@ Factory <|.. Symmetric
 Backend <|.. RSA
 Backend <|.. EC
 Backend <|.. Symmetric
+Signer <|.. RSA
+Signer <|.. EC
+Signer <|.. Symmetric
+SignatureVerifier <|.. RSA
+SignatureVerifier <|.. EC
+SignatureVerifier <|.. Symmetric
+Encrypter <|.. RSA
+Encrypter <|.. Symmetric
+Decrypter <|.. RSA
+Decrypter <|.. Symmetric
 JOSEEncoder <|.. RSA
 JOSEDecoder <|.. RSA
+JOSEEncoder <|.. EC
+JOSEDecoder <|.. EC
+JOSEEncoder <|.. Symmetric
+JOSEDecoder <|.. Symmetric
 
 package keysource {
     interface Source {
         + ID() string
-        + Load() []KeyCandidate
+        + Load(ctx) ([]KeyCandidate, error)
+        + Close() error
     }
-
     interface SelfRefreshingSource {
         + SetRefreshCallback(func([]KeyCandidate) error)
     }
-
     class FileSource
     class RandomSource
     class JWKSSource
-
     Source <|-- SelfRefreshingSource
     SelfRefreshingSource <|.. FileSource
     SelfRefreshingSource <|.. RandomSource
@@ -150,19 +224,35 @@ package keysource {
 
 package keystore {
     interface Repository {
-        + Find(ctx, selector) []Key
+        + Find(ctx, selector) ([]Key, error)
         + Replace(ctx, keys, selector) error
     }
-
-    class Store {
+    interface Keystore {
+        + Close() error
         + Bind(Source) error
         + RefreshAll() error
-        + Sign(ctx, message, options) SignResult
-        + VerifySignature(ctx, message, signature, options) error
+        + Sign(ctx, message, options ...SignOption) (SignResult, error)
+        + VerifySignature(ctx, message, signature, options ...VerifyOption) error
+        + Encrypt(ctx, plaintext, options ...EncryptOption) (EncryptResult, error)
+        + Decrypt(ctx, ciphertext, options ...DecryptOption) ([]byte, error)
     }
-
+    class Store
+    class SignResult {
+        + Signature []byte
+        + Key KeyDescriptor
+    }
+    class EncryptResult {
+        + Ciphertext []byte
+        + Key KeyDescriptor
+    }
+    Repository <|-- Keystore
+    Keystore <|.. Store
     Store *-- Repository
     Store o-- Source
+    Store --> SignResult
+    Store --> EncryptResult
+    SignResult --> KeyDescriptor
+    EncryptResult --> KeyDescriptor
 }
 
 Store --> BackendRegistry : builds candidates
