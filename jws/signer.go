@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/veles-security/vapi"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keystore"
 )
@@ -14,13 +16,22 @@ type Signer struct {
 	keystore keystore.Keystore
 }
 
-func New(keystore keystore.Keystore) (*Signer, error) {
-	if keystore == nil {
-		return nil, fmt.Errorf("JWS: nil keystore")
+type SignerConfigOption func(*Signer) error
+
+func New(options ...SignerConfigOption) (vapi.Signer[keystore.SignOption, JWS], error) {
+	signer := &Signer{}
+	for _, option := range options {
+		if option == nil {
+			return nil, vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil signer config option"))
+		}
+		if err := option(signer); err != nil {
+			return nil, vapi.NewErrorCategory(vapi.ErrMisconfigured, err)
+		}
 	}
-	return &Signer{
-		keystore: keystore,
-	}, nil
+	if signer.keystore == nil {
+		return nil, vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil signer keystore"))
+	}
+	return signer, nil
 }
 
 func (j *Signer) Sign(ctx context.Context, claims []byte, options ...keystore.SignOption) (JWS, error) {
