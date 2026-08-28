@@ -56,6 +56,54 @@ func aesGCM(t *testing.T, secret []byte) cipher.AEAD {
 	return gcm
 }
 
+func Test_store_SelectSigningKey(t *testing.T) {
+	secret := bytes.Repeat([]byte{0x42}, 32)
+	activeStore := encryptionStore(t, encryptionKey("active", key.KeyStatusActive, secret))
+	passiveStore := encryptionStore(t, encryptionKey("passive", key.KeyStatusPassive, secret))
+	canceledContext, cancel := context.WithCancel(context.Background())
+	cancel()
+	assertSelected := func(t *testing.T, descriptor key.KeyDescriptor, err error) {
+		if err != nil {
+			t.Fatalf("SelectSigningKey() error = %v", err)
+		}
+		if descriptor.ID != "active" || descriptor.Algorithm != symetric.HS256 {
+			t.Errorf("SelectSigningKey() = %#v, want active HS256 key", descriptor)
+		}
+		if descriptor.Material != nil {
+			t.Errorf("SelectSigningKey() material = %#v, want nil", descriptor.Material)
+		}
+	}
+	assertErrorContaining := func(want string) func(*testing.T, key.KeyDescriptor, error) {
+		return func(t *testing.T, descriptor key.KeyDescriptor, err error) {
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("SelectSigningKey() error = %v, want error containing %q", err, want)
+			}
+			if descriptor.ID != "" || descriptor.Algorithm != "" || descriptor.Material != nil {
+				t.Errorf("SelectSigningKey() = %#v, want zero descriptor", descriptor)
+			}
+		}
+	}
+	tests := []struct {
+		name       string
+		store      Keystore
+		ctx        context.Context
+		algorithms []key.KeyAlg
+		assertion  func(*testing.T, key.KeyDescriptor, error)
+	}{
+		{name: "Signing Key", store: activeStore, ctx: context.Background(), algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertSelected},
+		{name: "Empty Algorithms", store: activeStore, ctx: context.Background(), assertion: assertErrorContaining("algorithms are empty")},
+		{name: "Unsupported Algorithm", store: activeStore, ctx: context.Background(), algorithms: []key.KeyAlg{"unsupported"}, assertion: assertErrorContaining("no eligible key")},
+		{name: "Passive Key", store: passiveStore, ctx: context.Background(), algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("no eligible key")},
+		{name: "Canceled Context", store: activeStore, ctx: canceledContext, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("context canceled")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.store.SignKey(tt.ctx, SignOption(WithAlgorithms(tt.algorithms...)))
+			tt.assertion(t, got, gotErr)
+		})
+	}
+}
+
 func Test_store_Encrypt(t *testing.T) {
 	secret := bytes.Repeat([]byte{0x42}, 32)
 	plaintext := []byte("confidential message")

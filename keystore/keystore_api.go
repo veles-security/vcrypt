@@ -16,30 +16,28 @@ type SignResult struct {
 	Key       key.KeyDescriptor
 }
 
+// SignKey selects the key and algorithm that Sign would use. The
+// returned descriptor can be used to construct a protected header before its
+// encoded value becomes part of the message to sign. In a JWT header, Key.ID
+// is the "kid" value and Key.Algorithm is the "alg" value.
+func (k *store) SignKey(ctx context.Context, options ...SignOption) (key.KeyDescriptor, error) {
+	selected, algorithm, err := k.signingKey(ctx, options...)
+	if err != nil {
+		return key.KeyDescriptor{}, err
+	}
+
+	return selected.Descriptor(algorithm), nil
+}
+
 // Sign selects an active key that supports one of the requested algorithms and
 // signs message with it.
 func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption) (SignResult, error) {
-	var request operationQuery
-	for _, option := range k.runtimeOptions {
-		option(&request)
-	}
-	for _, option := range options {
-		option(&request)
-	}
-
-	if len(request.Algorithms) == 0 {
-		return SignResult{}, fmt.Errorf("keystore: signing algorithms are empty")
-	}
-
-	selected, algorithm, err := k.selectKey(ctx, key.KeyOpSign, request.Keys, request.Algorithms)
+	selected, algorithm, err := k.signingKey(ctx, options...)
 	if err != nil {
 		return SignResult{}, err
 	}
 
-	signer, ok := selected.Backend().(key.Signer)
-	if !ok {
-		return SignResult{}, fmt.Errorf("keystore: backend for key %q does not implement signing", selected.ID())
-	}
+	signer := selected.Backend().(key.Signer)
 	signature, err := signer.Sign(ctx, algorithm, message)
 	if err != nil {
 		return SignResult{}, fmt.Errorf("keystore: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
@@ -49,6 +47,32 @@ func (k *store) Sign(ctx context.Context, message []byte, options ...SignOption)
 		Signature: signature,
 		Key:       selected.Descriptor(algorithm),
 	}, nil
+}
+
+func (k *store) signingKey(ctx context.Context, options ...SignOption) (key.Key, key.KeyAlg, error) {
+	var request operationQuery
+	for _, option := range k.runtimeOptions {
+		option(&request)
+	}
+	for _, option := range options {
+		option(&request)
+	}
+
+	if len(request.Algorithms) == 0 {
+		return key.Key{}, "", fmt.Errorf("keystore: signing algorithms are empty")
+	}
+
+	selected, algorithm, err := k.selectKey(ctx, key.KeyOpSign, request.Keys, request.Algorithms)
+	if err != nil {
+		return key.Key{}, "", err
+	}
+
+	_, ok := selected.Backend().(key.Signer)
+	if !ok {
+		return key.Key{}, "", fmt.Errorf("keystore: backend for key %q does not implement signing", selected.ID())
+	}
+
+	return selected, algorithm, nil
 }
 
 // Verify selects a key and verifies signature. Active and passive
