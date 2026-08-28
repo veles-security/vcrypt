@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/veles-security/vapi"
 	"github.com/veles-security/vcrypt/backend"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keyset"
@@ -223,3 +224,7 @@ func (m *store) buildCandidates(candidates []key.KeyCandidate) ([]key.Key, error
 }
 
 var _ Keystore = &store{}
+var _ vapi.Signer[SignOption, SignResult] = &store{}
+var _ vapi.Verifier[VerifyOption] = &store{}
+var _ vapi.Encryptor[EncryptOption, EncryptResult] = &store{}
+var _ vapi.Decryptor[DecryptOption] = &store{}

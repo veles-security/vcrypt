@@ -4,4 +4,4 @@ go 1.26.7
 
 // replace github.com/veles-security/vapi => ../vapi
 
-require github.com/veles-security/vapi v1.10.0
+require github.com/veles-security/vapi v1.11.0
