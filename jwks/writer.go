@@ -99,7 +99,7 @@ func (w *Writer) writeArtifact(ctx context.Context, carrierWriter http.ResponseW
 
 	carrierWriter.WriteHeader(response.StatusCode)
 
-	if _, err := carrierWriter.Write(payload); err != nil {
+	if _, err := carrierWriter.Write(payload); err != nil { // nosemgrep: go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
 		return vapi.NewErrorCategory(vapi.ErrInternal, fmt.Errorf("write JWKS response: %w", err))
 	}
 	return nil
