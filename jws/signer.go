@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/veles-security/vapi"
 	"github.com/veles-security/vcrypt/key"
@@ -49,9 +50,7 @@ func (j *Signer) Sign(ctx context.Context, claims []byte, options ...SignerOptio
 		return JWS{}, err
 	}
 
-	allOptions := make([]SignerOption, 0, len(j.runtimeOptions)+len(options))
-	allOptions = append(allOptions, j.runtimeOptions...)
-	allOptions = append(allOptions, options...)
+	allOptions := slices.Concat(j.runtimeOptions, options)
 
 	next := j.sign
 	for index := len(allOptions) - 1; index >= 0; index-- {
@@ -66,7 +65,7 @@ func (j *Signer) Sign(ctx context.Context, claims []byte, options ...SignerOptio
 		next = wrapped
 	}
 
-	return next(ctx, claims, defaultHeader)
+	return next(ctx, claims, j.defaultHeader)
 }
 
 func (j *Signer) sign(ctx context.Context, claims []byte, buildHeader HeaderFunc, options ...keystore.SignOption) (JWS, error) {
@@ -96,13 +95,13 @@ func (j *Signer) sign(ctx context.Context, claims []byte, buildHeader HeaderFunc
 	}, nil
 }
 
-func defaultHeader(signKey key.KeyDescriptor) ([]byte, error) {
+func (j *Signer) defaultHeader(signKey key.KeyDescriptor) ([]byte, error) {
 	header, err := json.Marshal(map[string]string{
 		"kid": signKey.ID,
 		"alg": string(signKey.Algorithm),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("marshal protected header: %w", err)
+		return nil, vapi.NewErrorCategory(vapi.ErrInternal, fmt.Errorf("marshal header: %w", err))
 	}
 	return header, nil
 }
