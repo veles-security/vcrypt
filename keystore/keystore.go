@@ -14,11 +14,11 @@ import (
 	"github.com/veles-security/vcrypt/keysource"
 )
 
-type PrepareSignFunc func(key.KeyDescriptor) ([]byte, error)
+type SignFunc func(message []byte) ([]byte, error)
 
 type Keystore interface {
 	Keys(ctx context.Context, selector key.Selector) ([]key.Key, error)
-	SignPrepared(ctx context.Context, prepare PrepareSignFunc, options ...SignOption) (SignResult, error)
+	Signer(ctx context.Context, options ...SignOption) (key.KeyDescriptor, SignFunc, error)
 	Verify(ctx context.Context, message, signature []byte, options ...VerifyOption) error
 	Encrypt(ctx context.Context, plaintext []byte, options ...EncryptOption) (EncryptResult, error)
 	Decrypt(ctx context.Context, ciphertext []byte, options ...DecryptOption) ([]byte, error)

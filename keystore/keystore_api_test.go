@@ -7,7 +7,6 @@ import (
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha256"
-	"errors"
 	"strings"
 	"testing"
 
@@ -59,58 +58,75 @@ func aesGCM(t *testing.T, secret []byte) cipher.AEAD {
 	return gcm
 }
 
-func Test_store_SignPrepared(t *testing.T) {
+func Test_store_Signer(t *testing.T) {
 	secret := bytes.Repeat([]byte{0x42}, 32)
 	message := []byte("message to sign")
-	prepareErr := errors.New("prepare failed")
 	activeStore := encryptionStore(t, encryptionKey("active", key.KeyStatusActive, secret))
 	passiveStore := encryptionStore(t, encryptionKey("passive", key.KeyStatusPassive, secret))
 	shortKeyStore := encryptionStore(t, encryptionKey("short", key.KeyStatusActive, []byte("short")))
-	prepare := func(descriptor key.KeyDescriptor) ([]byte, error) {
-		return message, nil
-	}
-	assertSigned := func(t *testing.T, result SignResult, err error) {
+	assertSigned := func(t *testing.T, descriptor key.KeyDescriptor, sign SignFunc, err error) {
 		if err != nil {
-			t.Fatalf("SignPrepared() error = %v", err)
+			t.Fatalf("Signer() error = %v", err)
+		}
+		if descriptor.ID != "active" || descriptor.Algorithm != symetric.HS256 || descriptor.Material != nil {
+			t.Errorf("Signer() key descriptor = %#v, want active HS256 key without secret material", descriptor)
+		}
+		signature, signErr := sign(message)
+		if signErr != nil {
+			t.Fatalf("sign() error = %v", signErr)
 		}
 		mac := hmac.New(sha256.New, secret)
 		_, _ = mac.Write(message)
-		if !hmac.Equal(result.Signature, mac.Sum(nil)) {
-			t.Errorf("SignPrepared() signature = %x, want independently computed HMAC", result.Signature)
+		if !hmac.Equal(signature, mac.Sum(nil)) {
+			t.Errorf("sign() signature = %x, want independently computed HMAC", signature)
 		}
-		if result.Key.ID != "active" || result.Key.Algorithm != symetric.HS256 || result.Key.Material != nil {
-			t.Errorf("SignPrepared() key descriptor = %#v, want active HS256 key without secret material", result.Key)
+		secondSignature, secondErr := sign(message)
+		if secondErr == nil || !strings.Contains(secondErr.Error(), "already been used") || secondSignature != nil {
+			t.Errorf("second sign() = (%x, %v), want nil signature and already-used error", secondSignature, secondErr)
 		}
 	}
-	assertErrorContaining := func(want string) func(*testing.T, SignResult, error) {
-		return func(t *testing.T, result SignResult, err error) {
+	assertSignerErrorContaining := func(want string) func(*testing.T, key.KeyDescriptor, SignFunc, error) {
+		return func(t *testing.T, descriptor key.KeyDescriptor, sign SignFunc, err error) {
 			if err == nil || !strings.Contains(err.Error(), want) {
-				t.Errorf("SignPrepared() error = %v, want error containing %q", err, want)
+				t.Errorf("Signer() error = %v, want error containing %q", err, want)
 			}
-			if result.Signature != nil || result.Key.ID != "" {
-				t.Errorf("SignPrepared() result = %#v, want zero result", result)
+			if descriptor.ID != "" || sign != nil {
+				t.Errorf("Signer() = (%#v, %v), want zero descriptor and nil function", descriptor, sign)
 			}
+		}
+	}
+	assertSigningError := func(t *testing.T, descriptor key.KeyDescriptor, sign SignFunc, err error) {
+		if err != nil {
+			t.Fatalf("Signer() error = %v", err)
+		}
+		if descriptor.ID != "short" || sign == nil {
+			t.Fatalf("Signer() = (%#v, %v), want short key and signing function", descriptor, sign)
+		}
+		signature, signErr := sign(message)
+		if signErr == nil || !strings.Contains(signErr.Error(), "key is too short") || signature != nil {
+			t.Errorf("sign() = (%x, %v), want nil signature and short-key error", signature, signErr)
+		}
+		_, secondErr := sign(message)
+		if secondErr == nil || !strings.Contains(secondErr.Error(), "already been used") {
+			t.Errorf("second sign() error = %v, want already-used error", secondErr)
 		}
 	}
 	tests := []struct {
 		name       string
 		store      Keystore
-		prepare    PrepareSignFunc
 		algorithms []key.KeyAlg
-		assertion  func(*testing.T, SignResult, error)
+		assertion  func(*testing.T, key.KeyDescriptor, SignFunc, error)
 	}{
-		{name: "HMAC", store: activeStore, prepare: prepare, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertSigned},
-		{name: "Nil Prepare", store: activeStore, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("prepare signing message is nil")},
-		{name: "Prepare Failure", store: activeStore, prepare: func(key.KeyDescriptor) ([]byte, error) { return nil, prepareErr }, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("prepare failed")},
-		{name: "Empty Algorithms", store: activeStore, prepare: prepare, assertion: assertErrorContaining("algorithms are empty")},
-		{name: "Unsupported Algorithm", store: activeStore, prepare: prepare, algorithms: []key.KeyAlg{"unsupported"}, assertion: assertErrorContaining("no eligible key")},
-		{name: "Passive Key", store: passiveStore, prepare: prepare, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("no eligible key")},
-		{name: "Signing Failure", store: shortKeyStore, prepare: func(key.KeyDescriptor) ([]byte, error) { return message, nil }, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertErrorContaining("key is too short")},
+		{name: "HMAC And One Shot", store: activeStore, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertSigned},
+		{name: "Empty Algorithms", store: activeStore, assertion: assertSignerErrorContaining("algorithms are empty")},
+		{name: "Unsupported Algorithm", store: activeStore, algorithms: []key.KeyAlg{"unsupported"}, assertion: assertSignerErrorContaining("no eligible key")},
+		{name: "Passive Key", store: passiveStore, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertSignerErrorContaining("no eligible key")},
+		{name: "Signing Failure Consumes Signer", store: shortKeyStore, algorithms: []key.KeyAlg{symetric.HS256}, assertion: assertSigningError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := tt.store.SignPrepared(context.Background(), tt.prepare, SignOption(WithAlgorithms(tt.algorithms...)))
-			tt.assertion(t, got, gotErr)
+			gotDescriptor, gotSign, gotErr := tt.store.Signer(context.Background(), SignOption(WithAlgorithms(tt.algorithms...)))
+			tt.assertion(t, gotDescriptor, gotSign, gotErr)
 		})
 	}
 }

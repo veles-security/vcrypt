@@ -19,14 +19,13 @@ type signerKeystore struct {
 	optionCount *int
 }
 
-func (s signerKeystore) SignPrepared(_ context.Context, prepare keystore.PrepareSignFunc, options ...keystore.SignOption) (keystore.SignResult, error) {
+func (s signerKeystore) Signer(_ context.Context, options ...keystore.SignOption) (key.KeyDescriptor, keystore.SignFunc, error) {
 	if s.optionCount != nil {
 		*s.optionCount = len(options)
 	}
-	if _, err := prepare(s.descriptor); err != nil {
-		return keystore.SignResult{}, err
-	}
-	return keystore.SignResult{Signature: append([]byte(nil), s.signature...), Key: s.descriptor}, nil
+	return s.descriptor, func([]byte) ([]byte, error) {
+		return append([]byte(nil), s.signature...), nil
+	}, nil
 }
 
 func (signerKeystore) Keys(context.Context, key.Selector) ([]key.Key, error) { return nil, nil }
@@ -58,14 +57,18 @@ func Test_Signer_Sign(t *testing.T) {
 	// options
 	keystoreOption := keystore.SignOption(keystore.WithAlgorithms("RS256"))
 	runtimeOption := func(next SignFunc) SignFunc {
-		return func(ctx context.Context, claims []byte, header HeaderFunc, options ...keystore.SignOption) (JWS, error) {
-			return next(ctx, claims, header, append([]keystore.SignOption{keystoreOption}, options...)...)
+		return func(ctx context.Context, claims []byte, headerFunc HeaderFunc, options ...keystore.SignOption) (JWS, error) {
+			return next(ctx, claims, headerFunc, append([]keystore.SignOption{keystoreOption}, options...)...)
 		}
 	}
 	callOption := func(next SignFunc) SignFunc {
-		return func(ctx context.Context, claims []byte, _ HeaderFunc, options ...keystore.SignOption) (JWS, error) {
-			buildHeader := func(key.KeyDescriptor) ([]byte, error) { return customHeader, nil }
-			return next(ctx, claims, buildHeader, append(options, keystoreOption)...)
+		return func(ctx context.Context, claims []byte, headerFunc HeaderFunc, options ...keystore.SignOption) (JWS, error) {
+			decoratedHeaderFunc := func(signKey key.KeyDescriptor) map[string]string {
+				header := headerFunc(signKey)
+				header["typ"] = "JWT"
+				return header
+			}
+			return next(ctx, claims, decoratedHeaderFunc, append(options, keystoreOption)...)
 		}
 	}
 	nilSignFuncOption := func(SignFunc) SignFunc { return nil }

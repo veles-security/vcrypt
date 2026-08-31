@@ -4,25 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/veles-security/vcrypt/key"
 )
 
-// SignResult contains the signature and the exact key selection made by the
-// service.
-type SignResult struct {
-	Signature []byte
-	Key       key.KeyDescriptor
-}
-
-// SignPrepared selects a signing key, passes its public descriptor to prepare,
-// and signs the returned message with that exact key and algorithm.
-func (k *store) SignPrepared(ctx context.Context, prepare PrepareSignFunc, options ...SignOption) (SignResult, error) {
-	if prepare == nil {
-		return SignResult{}, fmt.Errorf("keystore: prepare signing message is nil")
-	}
-
+// Signer selects a signing key and returns its public descriptor together with
+// a function that signs one message with that exact key and algorithm.
+func (k *store) Signer(ctx context.Context, options ...SignOption) (key.KeyDescriptor, SignFunc, error) {
 	var request operationQuery
 	for _, option := range k.runtimeOptions {
 		option(&request)
@@ -32,29 +22,31 @@ func (k *store) SignPrepared(ctx context.Context, prepare PrepareSignFunc, optio
 	}
 
 	if len(request.Algorithms) == 0 {
-		return SignResult{}, fmt.Errorf("keystore: signing algorithms are empty")
+		return key.KeyDescriptor{}, nil, fmt.Errorf("keystore: signing algorithms are empty")
 	}
 
 	selected, algorithm, err := k.selectKey(ctx, key.KeyOpSign, request.Keys, request.Algorithms)
 	if err != nil {
-		return SignResult{}, err
+		return key.KeyDescriptor{}, nil, err
 	}
 
 	signer, ok := selected.Backend().(key.Signer)
 	if !ok {
-		return SignResult{}, fmt.Errorf("keystore: backend for key %q does not implement signing", selected.ID())
+		return key.KeyDescriptor{}, nil, fmt.Errorf("keystore: backend for key %q does not implement signing", selected.ID())
 	}
 	descriptor := selected.Descriptor(algorithm)
-	message, err := prepare(descriptor)
-	if err != nil {
-		return SignResult{}, fmt.Errorf("keystore: prepare signing message: %w", err)
+	var used atomic.Bool
+	sign := func(message []byte) ([]byte, error) {
+		if !used.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("keystore: signer for key %q has already been used", selected.ID())
+		}
+		signature, err := signer.Sign(ctx, algorithm, message)
+		if err != nil {
+			return nil, fmt.Errorf("keystore: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
+		}
+		return signature, nil
 	}
-	signature, err := signer.Sign(ctx, algorithm, message)
-	if err != nil {
-		return SignResult{}, fmt.Errorf("keystore: sign with key %q and algorithm %q: %w", selected.ID(), algorithm, err)
-	}
-
-	return SignResult{Signature: signature, Key: descriptor}, nil
+	return descriptor, sign, nil
 }
 
 // Verify selects a key and verifies signature. Active and passive

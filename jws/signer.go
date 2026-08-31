@@ -20,12 +20,11 @@ type Signer struct {
 
 type SignerConfigOption func(*Signer) error
 
-// HeaderFunc builds the protected header for the key selected by the keystore.
-type HeaderFunc func(key.KeyDescriptor) ([]byte, error)
+type HeaderFunc func(signKey key.KeyDescriptor) map[string]string
 
-// SignFunc signs claims using the supplied protected-header builder and
-// keystore options.
-type SignFunc func(ctx context.Context, claims []byte, header HeaderFunc, options ...keystore.SignOption) (JWS, error)
+// SignFunc signs claims using the supplied protected header and keystore
+// options. Signer options may decorate header before passing it to next.
+type SignFunc func(ctx context.Context, claims []byte, headerFunc HeaderFunc, options ...keystore.SignOption) (JWS, error)
 
 type SignerOption func(next SignFunc) SignFunc
 
@@ -65,45 +64,42 @@ func (j *Signer) Sign(ctx context.Context, claims []byte, options ...SignerOptio
 		next = wrapped
 	}
 
-	return next(ctx, claims, j.defaultHeader)
+	return next(ctx, claims, j.mapHeader)
 }
 
-func (j *Signer) sign(ctx context.Context, claims []byte, buildHeader HeaderFunc, options ...keystore.SignOption) (JWS, error) {
-	if buildHeader == nil {
-		return JWS{}, vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil JWS header function"))
+func (j *Signer) sign(ctx context.Context, claims []byte, headerFunc HeaderFunc, options ...keystore.SignOption) (JWS, error) {
+	if headerFunc == nil {
+		return JWS{}, vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil JWS header func"))
 	}
 
-	var header, message []byte
-	result, err := j.keystore.SignPrepared(ctx, func(signKey key.KeyDescriptor) ([]byte, error) {
-		var err error
-		header, err = buildHeader(signKey)
-		if err != nil {
-			return nil, fmt.Errorf("JWS: build protected header: %w", err)
-		}
-		message = []byte(base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims))
-		return message, nil
-	}, options...)
+	signKey, sign, err := j.keystore.Signer(ctx, options...)
+	if err != nil {
+		return JWS{}, err
+	}
+	headerMap := headerFunc(signKey)
+	header, err := json.Marshal(headerMap)
+	if err != nil {
+		return JWS{}, vapi.NewErrorCategory(vapi.ErrInternal, fmt.Errorf("marshal header: %w", err))
+	}
+	message := []byte(base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims))
+	signature, err := sign(message)
 	if err != nil {
 		return JWS{}, err
 	}
 	return JWS{
 		Header:    header,
 		Claims:    append([]byte(nil), claims...),
-		Signature: result.Signature,
-		Key:       result.Key,
-		Encoded:   []byte(string(message) + "." + base64.RawURLEncoding.EncodeToString(result.Signature)),
+		Signature: signature,
+		Key:       signKey,
+		Encoded:   []byte(string(message) + "." + base64.RawURLEncoding.EncodeToString(signature)),
 	}, nil
 }
 
-func (j *Signer) defaultHeader(signKey key.KeyDescriptor) ([]byte, error) {
-	header, err := json.Marshal(map[string]string{
-		"kid": signKey.ID,
-		"alg": string(signKey.Algorithm),
-	})
-	if err != nil {
-		return nil, vapi.NewErrorCategory(vapi.ErrInternal, fmt.Errorf("marshal header: %w", err))
-	}
-	return header, nil
+func (j *Signer) mapHeader(signKey key.KeyDescriptor) map[string]string {
+	header := map[string]string{}
+	header["kid"] = signKey.ID
+	header["alg"] = string(signKey.Algorithm)
+	return header
 }
 
 var _ vapi.Signer[SignerOption, JWS] = &Signer{}
