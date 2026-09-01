@@ -39,6 +39,15 @@ func NewVerifier(options ...VerifierConfigOption) (vapi.Verifier[VerifierOption]
 
 // Verify implements [vapi.Verifier].
 func (v *Verifier) Verify(ctx context.Context, message []byte, signature []byte, options ...VerifierOption) error {
+	if v == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier"))
+	}
+	if ctx == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier context"))
+	}
+	if v.keystore == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier keystore"))
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -62,6 +71,15 @@ func (v *Verifier) Verify(ctx context.Context, message []byte, signature []byte,
 }
 
 func (v *Verifier) verify(ctx context.Context, message []byte, signature []byte, options ...keystore.VerifyOption) error {
+	if v == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier"))
+	}
+	if ctx == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier context"))
+	}
+	if v.keystore == nil {
+		return vapi.NewErrorCategory(vapi.ErrMisconfigured, errors.New("nil verifier keystore"))
+	}
 	return v.keystore.Verify(ctx, message, signature, options...)
 }
 
