@@ -16,3 +16,13 @@ func WithSignerAlg(algorithm key.KeyAlg) SignerOption {
 		}
 	}
 }
+
+// WithSignerKeys restricts verification to keys matching selector.
+func WithSignerKeys(selector key.Selector) SignerOption {
+	return func(next SignFunc) SignFunc {
+		return func(ctx context.Context, claims []byte, headerFunc HeaderFunc, options ...keystore.SignOption) (JWS, error) {
+			keyOption := keystore.SignOption(keystore.WithKeys(selector))
+			return next(ctx, claims, headerFunc, append(options, keyOption)...)
+		}
+	}
+}

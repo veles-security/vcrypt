@@ -2,12 +2,16 @@ package jws
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/veles-security/vapi"
+	"github.com/veles-security/vcrypt/backend/symetric"
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keysource"
+	"github.com/veles-security/vcrypt/keysource/randomsource"
 	"github.com/veles-security/vcrypt/keystore"
 )
 
@@ -146,6 +150,7 @@ func Test_Verifier_Verify(t *testing.T) {
 	}{
 		{name: "Default", ctx: context.Background(), assertion: assertVerified(0)},
 		{name: "Signature Algorithm", ctx: context.Background(), options: []VerifierOption{WithVerifierAlg("RS256")}, assertion: assertVerified(1)},
+		{name: "Signing Key", ctx: context.Background(), options: []VerifierOption{WithVerifierKeys(key.Select(key.WithID("signing-key")))}, assertion: assertVerified(1)},
 		{name: "Runtime And Per-Call Options", ctx: context.Background(), runtimeOptions: []VerifierOption{runtimeOption}, options: []VerifierOption{callOption}, assertion: assertVerified(2)},
 		{name: "Keystore Error", ctx: context.Background(), storeError: verifyError, assertion: assertVerifyError},
 		{name: "Nil Context", assertion: assertMisconfigured},
@@ -165,6 +170,59 @@ func Test_Verifier_Verify(t *testing.T) {
 			}
 			err := verifier.Verify(tt.ctx, message, signature, tt.options...)
 			tt.assertion(t, store, err)
+		})
+	}
+}
+
+func Test_Signer_Verifier(t *testing.T) {
+	// payloads
+	claims := []byte(`{"sub":"alice"}`)
+	// keystores
+	store, err := keystore.New(keystore.WithSource(randomsource.New("jws-signing", randomsource.HMAC256, time.Hour)))
+	if err != nil {
+		t.Fatalf("keystore.New() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("keystore.Close() error = %v", err)
+		}
+	})
+	// signers and verifiers
+	signer, err := NewSigner(WithSignerKeystore(&store))
+	if err != nil {
+		t.Fatalf("NewSigner() error = %v", err)
+	}
+	verifier, err := NewVerifier(WithVerifierKeystore(&store))
+	if err != nil {
+		t.Fatalf("NewVerifier() error = %v", err)
+	}
+
+	// assertions
+	assertVerified := func(t *testing.T, err error) {
+		if err != nil {
+			t.Errorf("Verify() error = %v", err)
+		}
+	}
+	tests := []struct {
+		name      string
+		assertion func(*testing.T, error)
+	}{
+		{name: "Random Source Signature", assertion: assertVerified},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signed, err := signer.Sign(context.Background(), claims, WithSignerAlg(symetric.HS256))
+			if err != nil {
+				t.Fatalf("Sign() error = %v", err)
+			}
+			message := []byte(base64.RawURLEncoding.EncodeToString(signed.Header) + "." + base64.RawURLEncoding.EncodeToString(signed.Claims))
+			tt.assertion(t, verifier.Verify(
+				context.Background(),
+				message,
+				signed.Signature,
+				WithVerifierKeys(key.Select(key.WithID(signed.Key.ID))),
+				WithVerifierAlg(symetric.HS256),
+			))
 		})
 	}
 }

@@ -16,3 +16,13 @@ func WithVerifierAlg(algorithm key.KeyAlg) VerifierOption {
 		}
 	}
 }
+
+// WithVerifierKeys restricts verification to keys matching selector.
+func WithVerifierKeys(selector key.Selector) VerifierOption {
+	return func(next VerifyFunc) VerifyFunc {
+		return func(ctx context.Context, message []byte, signature []byte, options ...keystore.VerifyOption) error {
+			keyOption := keystore.VerifyOption(keystore.WithKeys(selector))
+			return next(ctx, message, signature, append(options, keyOption)...)
+		}
+	}
+}
