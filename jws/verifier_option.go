@@ -2,6 +2,7 @@ package jws
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/veles-security/vcrypt/key"
 	"github.com/veles-security/vcrypt/keystore"
@@ -25,4 +26,13 @@ func WithVerifierKeys(selector key.Selector) VerifierOption {
 			return next(ctx, message, signature, append(options, keyOption)...)
 		}
 	}
+}
+
+func WithVerifierTokenHeader(header []byte) VerifierOption {
+	var tokenHeader struct {
+		KeyID string `json:"kid"`
+	}
+	_ = json.Unmarshal(header, &tokenHeader)
+
+	return WithVerifierKeys(key.Select(key.WithID(tokenHeader.KeyID)))
 }
