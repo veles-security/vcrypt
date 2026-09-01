@@ -28,7 +28,7 @@ type SignFunc func(ctx context.Context, claims []byte, headerFunc HeaderFunc, op
 
 type SignerOption func(next SignFunc) SignFunc
 
-func New(options ...SignerConfigOption) (vapi.Signer[SignerOption, JWS], error) {
+func NewSigner(options ...SignerConfigOption) (vapi.Signer[SignerOption, JWS], error) {
 	signer := &Signer{}
 	for _, option := range options {
 		if option == nil {

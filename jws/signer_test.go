@@ -102,7 +102,7 @@ func Test_Signer_Sign(t *testing.T) {
 		assertion      func(*testing.T, JWS, error)
 	}{
 		{name: "Default Header", assertion: assertSigned([]byte(`{"alg":"RS256","kid":"signing-key"}`), defaultEncoded, 0)},
-		{name: "Signature Algorithm", options: []SignerOption{WithAlgorithm("RS256")}, assertion: assertSigned([]byte(`{"alg":"RS256","kid":"signing-key"}`), defaultEncoded, 1)},
+		{name: "Signature Algorithm", options: []SignerOption{WithSignerAlg("RS256")}, assertion: assertSigned([]byte(`{"alg":"RS256","kid":"signing-key"}`), defaultEncoded, 1)},
 		{name: "Decorated Header And Keystore Options", runtimeOptions: []SignerOption{runtimeOption}, options: []SignerOption{callOption}, assertion: assertSigned(customHeader, customEncoded, 2)},
 		{name: "Nil Runtime Option", runtimeOptions: []SignerOption{nil}, assertion: assertMisconfigured},
 		{name: "Nil Per-Call Option", options: []SignerOption{nil}, assertion: assertMisconfigured},
@@ -111,7 +111,7 @@ func Test_Signer_Sign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			optionCount = 0
-			signer, err := New(WithSignerKeystore(&keystoreInterface), WithSignerRuntimeOptions(tt.runtimeOptions...))
+			signer, err := NewSigner(WithSignerKeystore(&keystoreInterface), WithSignerRuntimeOptions(tt.runtimeOptions...))
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
 			}
